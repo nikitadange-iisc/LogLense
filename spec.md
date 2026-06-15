@@ -71,3 +71,16 @@ This project proposes a multi-stage retrieval-augmented agentic pipeline that co
 4. Store mapping: FAISS index position → session metadata (raw lines, line numbers, known root cause if labeled).
 5. Persist FAISS index and metadata store to disk.
 
+## Stage 6: Retrieval-Augmented Agentic Reasoning
+
+- At inference, embed the flagged session and retrieve top-K similar historical failures from FAISS.
+- Assemble a prompt with the flagged lines + retrieved examples.
+- Pass to GPT-4o-mini (or equivalent LLM agent) for root cause identification and line-level failure trace output.
+
+### Implementation Steps
+1. Embed incoming flagged session using the same sentence-transformer model.
+2. Query FAISS index for top-K (e.g., K=3) nearest neighbors.
+3. Build prompt template combining: flagged log lines + top-K retrieved failure examples + instructions for output format.
+4. Call GPT-4o-mini (or Claude API) with assembled prompt, optionally via an agent loop for multi-step reasoning (e.g., tool calls to re-query FAISS or fetch additional context).
+5. Parse response into structured output: affected line range, root cause description, confidence/explanation.
+
