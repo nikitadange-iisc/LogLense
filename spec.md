@@ -97,7 +97,7 @@ New log file
 5. Parse response into structured output: affected line range, root cause description, confidence/explanation.
 
 ## Project File Structure
-LogLense/
+LogSense/
 ├── data/
 │   ├── raw/              # Raw LogHub log files (HDFS, BGL, Thunderbird)
 │   └── processed/        # Deduplicated/parsed intermediate outputs
