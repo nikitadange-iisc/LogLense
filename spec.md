@@ -7,6 +7,20 @@ Modern distributed systems generate log data at large scale, making it hard to a
 This project proposes a multi-stage retrieval-augmented agentic pipeline that compresses log volume before any LLM involvement, enabling precise anomaly explanation and failure trace identification at scale. The pipeline uses the LogHub dataset (HDFS ~11M lines, BGL ~4.7M lines, Thunderbird ~211M lines).
 
 ## Pipeline Overview
+
+````
+New log file
+    ↓ Streaming ingestion + dedup
+    ↓ Drain algorithm → event templates / sequences
+    ↓ Session grouping (Block ID / sliding window) → event count vectors
+    ↓ Isolation Forest → score each session (normal vs anomalous)
+    ↓ (only flagged anomalous sessions proceed)
+    ↓ Embed flagged session text (sentence-transformer)
+    ↓ FAISS search → top-K similar historical failures
+    ↓ Assemble prompt: [flagged lines] + [top-K retrieved examples]
+    ↓ GPT-4o-mini → root cause + line-level failure trace
+```
+
 ## Stage 1: Streaming Ingestion & Deduplication
 
 - Read log file line-by-line (streaming, no full in-memory load).
