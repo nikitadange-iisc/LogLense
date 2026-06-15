@@ -127,3 +127,17 @@ LogLense/
 
 This is the initial project specification for LogSense, outlining the proposed pipeline stages, architecture, and implementation plan. Team members are requested to review this spec. Any further modifications, additions, or corrections will be discussed, updated, and pushed accordingly as the project progresses.
 
+
+## Team
+
+- Team Name: LogSense
+- Members:
+  - Vasanthakumar S
+  - Atreyee Mondal
+  - Dange Nikita Dilip
+  - Sujith Shetty
+  - Dhananjaya B R
+  - Raj Shekhar
+  - Balla Malleswara Rao
+  - Aele Santhosh
+
