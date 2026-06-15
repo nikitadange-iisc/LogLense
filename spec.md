@@ -33,3 +33,17 @@ This project proposes a multi-stage retrieval-augmented agentic pipeline that co
 4. Persist the template miner state (drain config/state file) for reuse across runs.
 5. Validate template count is approximately stable (sanity check against expected unique templates per dataset).
 
+## Stage 3: Session Grouping & Vectorization
+
+- Group parsed lines into sessions:
+  - HDFS: group by Block ID.
+  - BGL/Thunderbird: group by sliding window of N events.
+- Represent each session as a fixed-length event count vector (count of each event template ID within the session).
+
+### Implementation Steps
+1. Implement Block ID extraction from Drain variable output (HDFS).
+2. Implement sliding-window session builder for non-block-based datasets.
+3. Build a global event template vocabulary (template_id → vector index).
+4. Construct fixed-length count vectors per session (length = number of unique templates).
+5. Store session metadata: session_id, line range, raw lines, vector.
+
