@@ -154,3 +154,14 @@ Source: LogHub (https://github.com/logpai/loghub)
 
 Each dataset includes ground-truth anomaly labels used for Isolation Forest training and final evaluation.
 
+
+## Tech Stack
+
+- **Language**: Python 3.10+
+- **Log Parsing**: Drain3
+- **ML**: scikit-learn (Isolation Forest)
+- **Embeddings**: sentence-transformers (`all-MiniLM-L6-v2`)
+- **Vector Store**: FAISS
+- **LLM/Agent**: GPT-4o-mini (primary), Claude API (alternative/fallback)
+- **Orchestration**: Python scripts / agentic framework (e.g., LangGraph) for multi-step reasoning
+
