@@ -141,3 +141,16 @@ This is the initial project specification for LogSense, outlining the proposed p
   - Balla Malleswara Rao
   - Aele Santhosh
 
+
+## Datasets
+
+Source: LogHub (https://github.com/logpai/loghub)
+
+| Dataset    | Size      | Use Case                          |
+|------------|-----------|-----------------------------------|
+| HDFS       | ~11M lines | Primary pipeline development (Block ID sessions) |
+| BGL        | ~4.7M lines | Sliding-window sessionization, evaluation |
+| Thunderbird| ~211M lines | Scale testing, extended evaluation |
+
+Each dataset includes ground-truth anomaly labels used for Isolation Forest training and final evaluation.
+
