@@ -123,3 +123,8 @@ LogLense/
 3. **GitHub repo** with full commit history, remote accessible to evaluator.
 4. **MS Forms entry** (individual): summary of personal contribution, tied to commit history.
 
+
+## Note to Team
+
+This is the initial project specification for LogSense, outlining the proposed pipeline stages, architecture, and implementation plan. Team members are requested to review this spec. Any further modifications, additions, or corrections will be discussed, updated, and pushed accordingly as the project progresses.
+
