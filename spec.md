@@ -21,3 +21,15 @@ This project proposes a multi-stage retrieval-augmented agentic pipeline that co
 3. Write deduplicated lines to an intermediate file or yield to next stage.
 4. Unit test with a small sample log file containing repeated lines.
 
+## Stage 2: Log Parsing with Drain Algorithm
+
+- Parse each log line into an event template, extracting dynamic variables (block IDs, IP addresses, timestamps, etc.).
+- Reduces millions of raw lines to a small set of unique event templates per dataset.
+
+### Implementation Steps
+1. Integrate Drain3 library (or implement Drain tree-based parser).
+2. Configure regex masks for known variable patterns (IP, block ID, numbers).
+3. For each incoming line, output: `(event_template_id, extracted_variables, raw_line, line_number)`.
+4. Persist the template miner state (drain config/state file) for reuse across runs.
+5. Validate template count is approximately stable (sanity check against expected unique templates per dataset).
+
