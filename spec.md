@@ -165,3 +165,12 @@ Each dataset includes ground-truth anomaly labels used for Isolation Forest trai
 - **LLM/Agent**: GPT-4o-mini (primary), Claude API (alternative/fallback)
 - **Orchestration**: Python scripts / agentic framework (e.g., LangGraph) for multi-step reasoning
 
+
+## Evaluation Metrics
+
+- **Anomaly Detection (Isolation Forest gate)**: Precision, Recall, F1-score against LogHub ground-truth anomaly labels.
+- **Compression Efficiency**: % reduction in lines/tokens passed to LLM vs. raw log volume.
+- **Retrieval Quality**: Top-K retrieval relevance (qualitative check against known failure patterns).
+- **Root Cause Accuracy**: Manual/qualitative review of LLM-generated root cause explanations against known incident causes in labeled data.
+- **Latency**: End-to-end processing time per session (ingestion to LLM output).
+
