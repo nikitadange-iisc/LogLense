@@ -8,3 +8,4 @@ Modern distributed systems generate log data at large scale, making it hard to a
 
 This project proposes a multi-stage retrieval-augmented agentic pipeline that compresses log volume before any LLM involvement, enabling precise anomaly explanation and failure trace identification at scale. The pipeline uses the LogHub dataset (HDFS ~11M lines, BGL ~4.7M lines, Thunderbird ~211M lines).
 
+## Pipeline Overview
