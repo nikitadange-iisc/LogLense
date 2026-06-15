@@ -59,3 +59,15 @@ This project proposes a multi-stage retrieval-augmented agentic pipeline that co
 4. Threshold scores to classify session as normal/anomalous.
 5. Log gate statistics (e.g., % sessions discarded) for monitoring.
 
+## Stage 5: Embedding & FAISS Vector Store
+
+- Transform flagged anomalous sessions into embeddings using a sentence-transformer model.
+- Store only anomalous session embeddings in a FAISS vector database (normal sessions never indexed).
+
+### Implementation Steps
+1. Choose sentence-transformer model (e.g., `all-MiniLM-L6-v2`).
+2. Convert each flagged session's text (concatenated raw lines or template sequence) into an embedding.
+3. Build/maintain a FAISS index (e.g., `IndexFlatL2` or `IndexIVFFlat`) for anomalous session embeddings.
+4. Store mapping: FAISS index position → session metadata (raw lines, line numbers, known root cause if labeled).
+5. Persist FAISS index and metadata store to disk.
+
