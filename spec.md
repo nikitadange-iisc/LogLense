@@ -84,3 +84,24 @@ This project proposes a multi-stage retrieval-augmented agentic pipeline that co
 4. Call GPT-4o-mini (or Claude API) with assembled prompt, optionally via an agent loop for multi-step reasoning (e.g., tool calls to re-query FAISS or fetch additional context).
 5. Parse response into structured output: affected line range, root cause description, confidence/explanation.
 
+## Project File Structure
+LogLense/
+├── data/
+│   ├── raw/              # Raw LogHub log files (HDFS, BGL, Thunderbird)
+│   └── processed/        # Deduplicated/parsed intermediate outputs
+├── src/
+│   ├── ingestion.py       # Stage 1: streaming read + dedup
+│   ├── parser.py          # Stage 2: Drain-based parsing
+│   ├── sessionizer.py      # Stage 3: session grouping + vectorization
+│   ├── anomaly_gate.py    # Stage 4: Isolation Forest training/inference
+│   ├── embedder.py        # Stage 5: sentence-transformer embeddings
+│   ├── vector_store.py    # Stage 5: FAISS index management
+│   ├── rag_pipeline.py    # Stage 6: retrieval + LLM/agent prompt assembly
+│   └── pipeline.py        # End-to-end orchestration
+├── models/
+│   ├── isolation_forest.joblib
+│   └── faiss_index/
+├── tests/
+├── .env
+├── requirements.txt
+└── spec.md
