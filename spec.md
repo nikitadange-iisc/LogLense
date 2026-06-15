@@ -105,3 +105,21 @@ LogLense/
 ├── .env
 ├── requirements.txt
 └── spec.md
+## Milestones
+
+1. **M1**: Streaming ingestion + deduplication module working on sample HDFS logs.
+2. **M2**: Drain parser integrated, event templates extracted and validated.
+3. **M3**: Session grouping (HDFS by Block ID) + vectorization complete.
+4. **M4**: Isolation Forest trained on labeled normal sessions, gating functional.
+5. **M5**: Embedding + FAISS index built for flagged anomalous sessions.
+6. **M6**: End-to-end RAG pipeline with LLM/agent root-cause output on HDFS dataset.
+7. **M7**: Extend pipeline to BGL/Thunderbird with sliding-window sessionization.
+8. **M8**: Evaluation against LogHub ground-truth labels (precision/recall on anomaly detection, qualitative review of root-cause explanations).
+
+## Final Submission Requirements (Due: June 24, 8:00 AM)
+
+1. **PDF Report** (ECAI template, 3 pages main text + appendix from page 4 with section-linked supporting details).
+2. **Demo link** (YouTube video or hosted web demo, e.g. github.io/vercel).
+3. **GitHub repo** with full commit history, remote accessible to evaluator.
+4. **MS Forms entry** (individual): summary of personal contribution, tied to commit history.
+
