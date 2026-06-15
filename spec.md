@@ -1,4 +1,3 @@
-# LogLense Spec
 # LogSense: An Agentic AI Framework for Root Cause Analysis of Large-Scale System Logs
 
 
