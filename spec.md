@@ -47,3 +47,15 @@ This project proposes a multi-stage retrieval-augmented agentic pipeline that co
 4. Construct fixed-length count vectors per session (length = number of unique templates).
 5. Store session metadata: session_id, line range, raw lines, vector.
 
+## Stage 4: Isolation Forest Anomaly Gate
+
+- Train Isolation Forest on normal session vectors using LogHub ground-truth labels.
+- At inference, score each session vector; discard normal sessions, pass only flagged anomalous sessions downstream.
+
+### Implementation Steps
+1. Load LogHub ground-truth labels and filter normal-labeled sessions for training.
+2. Train `IsolationForest` (scikit-learn) on normal session vectors; save model (joblib/pickle).
+3. At inference, run `model.predict()` / `decision_function()` on each session vector.
+4. Threshold scores to classify session as normal/anomalous.
+5. Log gate statistics (e.g., % sessions discarded) for monitoring.
+
