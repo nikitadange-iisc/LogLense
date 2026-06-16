@@ -1,14 +1,16 @@
 # LogSense: An Agentic AI Framework for Root Cause Analysis of Large-Scale System Logs
 
+> **Version**: 1.1 · **Last Updated**: June 16, 2026
 
-### Abstract
+## Abstract
+
 Modern distributed systems generate log data at large scale, making it hard to analyze and computationally expensive for naive LLM-based analysis. Direct ingestion of raw logs into an LLM exhausts context windows, inflates token cost, and fails to achieve proper reasoning over failure events.
 
 This project proposes a multi-stage retrieval-augmented agentic pipeline that compresses log volume before any LLM involvement, enabling precise anomaly explanation and failure trace identification at scale. The pipeline uses the LogHub dataset (HDFS ~11M lines, BGL ~4.7M lines, Thunderbird ~211M lines).
 
 ## Pipeline Overview
 
-````
+```
 New log file
     ↓ Streaming ingestion + dedup
     ↓ Drain algorithm → event templates / sequences
@@ -37,13 +39,17 @@ New log file
 
 - Parse each log line into an event template, extracting dynamic variables (block IDs, IP addresses, timestamps, etc.).
 - Reduces millions of raw lines to a small set of unique event templates per dataset.
+- **Dataset-aware header preprocessing**: strip structured headers (timestamp, PID, node-ID) before Drain parsing so templates are not polluted by variable metadata.
+- **Severity extraction**: log level (INFO/WARN/ERROR/FATAL) is returned as a first-class field with a numeric severity score for downstream anomaly weighting.
 
 ### Implementation Steps
-1. Integrate Drain3 library (or implement Drain tree-based parser).
-2. Configure regex masks for known variable patterns (IP, block ID, numbers).
-3. For each incoming line, output: `(event_template_id, extracted_variables, raw_line, line_number)`.
-4. Persist the template miner state (drain config/state file) for reuse across runs.
-5. Validate template count is approximately stable (sanity check against expected unique templates per dataset).
+1. Integrate Drain3 library with per-dataset hyper-parameter profiles (sim_th, depth, max_children).
+2. Implement dataset-specific header regex patterns for HDFS, BGL, and Thunderbird to separate structured fields from free-text content.
+3. Configure ordered masking instructions: BLOCK_ID → IP_PORT → IP_ADDR → HEX → PATH → LONG_NUM → NUM (specificity-first).
+4. For each incoming line, output: `(event_template_id, event_template, extracted_variables, raw_line, line_number, level, severity_score, component)`.
+5. Extract variables via template-aligned token matching — align content tokens against Drain's `<*>` wildcard slots rather than relying on a fixed regex list.
+6. Persist the full TemplateMiner state via pickle for reuse across runs (not just template metadata).
+7. Validate template count is approximately stable (sanity check against expected unique templates per dataset).
 
 ## Stage 3: Session Grouping & Vectorization
 
@@ -75,10 +81,13 @@ New log file
 
 - Transform flagged anomalous sessions into embeddings using a sentence-transformer model.
 - Store only anomalous session embeddings in a FAISS vector database (normal sessions never indexed).
+- **Upgraded default model**: `all-mpnet-base-v2` (768-dim) for significantly higher retrieval quality vs. the lightweight `all-MiniLM-L6-v2` (384-dim). Automatic fallback if the primary model is unavailable.
+- **Hybrid embedding mode**: prepends a severity summary, uses the deduplicated event-template sequence for structure, and appends head+tail raw lines for concrete detail — capturing both the failure pattern and specific error text.
+- **Smart truncation**: keeps both head and tail of long sessions (not just the first N chars) so failure indicators at the end are preserved.
 
 ### Implementation Steps
-1. Choose sentence-transformer model (e.g., `all-MiniLM-L6-v2`).
-2. Convert each flagged session's text (concatenated raw lines or template sequence) into an embedding.
+1. Use sentence-transformer model `all-mpnet-base-v2` (primary, 768-dim) with `all-MiniLM-L6-v2` as fallback.
+2. Prepare session text in "hybrid" mode: severity prefix + template sequence + head/tail raw lines.
 3. Build/maintain a FAISS index (e.g., `IndexFlatL2` or `IndexIVFFlat`) for anomalous session embeddings.
 4. Store mapping: FAISS index position → session metadata (raw lines, line numbers, known root cause if labeled).
 5. Persist FAISS index and metadata store to disk.
@@ -97,14 +106,16 @@ New log file
 5. Parse response into structured output: affected line range, root cause description, confidence/explanation.
 
 ## Project File Structure
+
+```
 LogSense/
 ├── data/
 │   ├── raw/              # Raw LogHub log files (HDFS, BGL, Thunderbird)
 │   └── processed/        # Deduplicated/parsed intermediate outputs
 ├── src/
 │   ├── ingestion.py       # Stage 1: streaming read + dedup
-│   ├── parser.py          # Stage 2: Drain-based parsing
-│   ├── sessionizer.py      # Stage 3: session grouping + vectorization
+│   ├── log_parser.py      # Stage 2: Drain-based parsing
+│   ├── sessionizer.py     # Stage 3: session grouping + vectorization
 │   ├── anomaly_gate.py    # Stage 4: Isolation Forest training/inference
 │   ├── embedder.py        # Stage 5: sentence-transformer embeddings
 │   ├── vector_store.py    # Stage 5: FAISS index management
@@ -117,6 +128,8 @@ LogSense/
 ├── .env
 ├── requirements.txt
 └── spec.md
+```
+
 ## Milestones
 
 1. **M1**: Streaming ingestion + deduplication module working on sample HDFS logs.
@@ -138,7 +151,7 @@ LogSense/
 
 ## Note to Team
 
-This is the initial project specification for LogSense, outlining the proposed pipeline stages, architecture, and implementation plan. Team members are requested to review this spec. Any further modifications, additions, or corrections will be discussed, updated, and pushed accordingly as the project progresses.
+This is the working project specification for LogSense. The core pipeline modules have been implemented and unit-tested. Team members should review this spec alongside the codebase. Any further modifications, additions, or corrections will be discussed, updated, and pushed accordingly as the project progresses.
 
 
 ## Team
@@ -170,10 +183,10 @@ Each dataset includes ground-truth anomaly labels used for Isolation Forest trai
 
 ## Tech Stack
 
-- **Language**: Python 3.10+
+- **Language**: Python 3.9+
 - **Log Parsing**: Drain3
 - **ML**: scikit-learn (Isolation Forest)
-- **Embeddings**: sentence-transformers (`all-MiniLM-L6-v2`)
+- **Embeddings**: sentence-transformers (`all-mpnet-base-v2` primary, `all-MiniLM-L6-v2` fallback)
 - **Vector Store**: FAISS
 - **LLM/Agent**: GPT-4o-mini (primary), Claude API (alternative/fallback)
 - **Orchestration**: Python scripts / agentic framework (e.g., LangGraph) for multi-step reasoning
@@ -186,4 +199,3 @@ Each dataset includes ground-truth anomaly labels used for Isolation Forest trai
 - **Retrieval Quality**: Top-K retrieval relevance (qualitative check against known failure patterns).
 - **Root Cause Accuracy**: Manual/qualitative review of LLM-generated root cause explanations against known incident causes in labeled data.
 - **Latency**: End-to-end processing time per session (ingestion to LLM output).
-
