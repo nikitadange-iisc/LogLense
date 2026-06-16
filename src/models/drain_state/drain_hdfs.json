@@ -1,0 +1,41 @@
+{
+  "dataset": "hdfs",
+  "template_count": 6,
+  "templates": [
+    {
+      "cluster_id": 1,
+      "template": "PacketResponder <NUM> for block <BLOCK_ID> terminating",
+      "size": 2
+    },
+    {
+      "cluster_id": 2,
+      "template": "Receiving block <BLOCK_ID> src: /<IP_PORT> dest: /<IP_PORT>",
+      "size": 4
+    },
+    {
+      "cluster_id": 3,
+      "template": "BLOCK* NameSystem.allocateBlock: <PATH> <BLOCK_ID>",
+      "size": 1
+    },
+    {
+      "cluster_id": 4,
+      "template": "BLOCK* NameSystem.addStoredBlock: blockMap updated: <IP_PORT> is added to <BLOCK_ID> size <LONG_NUM>",
+      "size": 1
+    },
+    {
+      "cluster_id": 5,
+      "template": "BLOCK* NameSystem.addStoredBlock: Redundant addStoredBlock request received for <BLOCK_ID>",
+      "size": 1
+    },
+    {
+      "cluster_id": 6,
+      "template": "Received block <BLOCK_ID> of size <LONG_NUM> from /<IP_ADDR>",
+      "size": 1
+    }
+  ],
+  "stats": {
+    "total_lines": 10,
+    "header_parsed": 10,
+    "header_failed": 0
+  }
+}
