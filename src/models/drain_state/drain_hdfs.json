@@ -1,41 +1,111 @@
 {
   "dataset": "hdfs",
-  "template_count": 6,
+  "template_count": 20,
   "templates": [
     {
       "cluster_id": 1,
-      "template": "PacketResponder <NUM> for block <BLOCK_ID> terminating",
-      "size": 2
+      "template": "Receiving block <BLOCK_ID> src: /<IP_PORT> dest: /<IP_PORT>",
+      "size": 23611
     },
     {
       "cluster_id": 2,
-      "template": "Receiving block <BLOCK_ID> src: /<IP_PORT> dest: /<IP_PORT>",
-      "size": 4
+      "template": "BLOCK* NameSystem.allocateBlock: <PATH> <BLOCK_ID>",
+      "size": 7940
     },
     {
       "cluster_id": 3,
-      "template": "BLOCK* NameSystem.allocateBlock: <PATH> <BLOCK_ID>",
-      "size": 1
+      "template": "PacketResponder <NUM> for block <BLOCK_ID> terminating",
+      "size": 22224
     },
     {
       "cluster_id": 4,
-      "template": "BLOCK* NameSystem.addStoredBlock: blockMap updated: <IP_PORT> is added to <BLOCK_ID> size <LONG_NUM>",
-      "size": 1
+      "template": "Received block <BLOCK_ID> of size <*> from /<IP_ADDR>",
+      "size": 22030
     },
     {
       "cluster_id": 5,
-      "template": "BLOCK* NameSystem.addStoredBlock: Redundant addStoredBlock request received for <BLOCK_ID>",
-      "size": 1
+      "template": "BLOCK* NameSystem.addStoredBlock: blockMap updated: <IP_PORT> is added to <BLOCK_ID> size <*>",
+      "size": 22287
     },
     {
       "cluster_id": 6,
-      "template": "Received block <BLOCK_ID> of size <LONG_NUM> from /<IP_ADDR>",
+      "template": "Received block <BLOCK_ID> src: /<IP_PORT> dest: /<IP_PORT> of size <*>",
+      "size": 29
+    },
+    {
+      "cluster_id": 7,
+      "template": "<IP_PORT>:Transmitted block <BLOCK_ID> to /<IP_PORT>",
+      "size": 25
+    },
+    {
+      "cluster_id": 8,
+      "template": "<IP_PORT> Starting thread to transfer block <BLOCK_ID> to <IP_PORT>, <IP_PORT>",
+      "size": 4
+    },
+    {
+      "cluster_id": 9,
+      "template": "BLOCK* ask <IP_PORT> to replicate <BLOCK_ID> to datanode(s) <IP_PORT> <IP_PORT>",
+      "size": 4
+    },
+    {
+      "cluster_id": 10,
+      "template": "<IP_PORT> Served block <BLOCK_ID> to /<IP_ADDR>",
+      "size": 407
+    },
+    {
+      "cluster_id": 11,
+      "template": "BLOCK* ask <IP_PORT> to replicate <BLOCK_ID> to datanode(s) <IP_PORT>",
+      "size": 22
+    },
+    {
+      "cluster_id": 12,
+      "template": "<IP_PORT> Starting thread to transfer block <BLOCK_ID> to <IP_PORT>",
+      "size": 22
+    },
+    {
+      "cluster_id": 13,
+      "template": "Verification succeeded for <BLOCK_ID>",
+      "size": 1088
+    },
+    {
+      "cluster_id": 14,
+      "template": "writeBlock <BLOCK_ID> received exception java.net.SocketTimeoutException",
+      "size": 1
+    },
+    {
+      "cluster_id": 15,
+      "template": "PacketResponder <BLOCK_ID> <NUM> Exception java.io.EOFException",
+      "size": 1
+    },
+    {
+      "cluster_id": 16,
+      "template": "writeBlock <BLOCK_ID> received exception java.io.IOException: Could not read from stream",
+      "size": 62
+    },
+    {
+      "cluster_id": 17,
+      "template": "Deleting block <BLOCK_ID> file <PATH><BLOCK_ID>",
+      "size": 22
+    },
+    {
+      "cluster_id": 18,
+      "template": "Receiving empty packet for block <BLOCK_ID>",
+      "size": 24
+    },
+    {
+      "cluster_id": 19,
+      "template": "Exception in receiveBlock for block <BLOCK_ID> java.io.IOException: Connection reset by peer",
+      "size": 1
+    },
+    {
+      "cluster_id": 20,
+      "template": "writeBlock <BLOCK_ID> received exception java.io.IOException: Connection reset by peer",
       "size": 1
     }
   ],
   "stats": {
-    "total_lines": 10,
-    "header_parsed": 10,
+    "total_lines": 99805,
+    "header_parsed": 99805,
     "header_failed": 0
   }
 }
