@@ -89,7 +89,7 @@ class LogSensePipeline:
         if self._anomaly_gate is None:
             self._anomaly_gate = AnomalyGate(
                 model_path=str(self.model_dir / "isolation_forest.joblib"),
-                contamination=self.config.get("contamination", 0.1),
+                contamination=self.config.get("contamination", 0.03),
             )
         return self._anomaly_gate
 
@@ -216,7 +216,7 @@ class LogSensePipeline:
                 # Train on all data with contamination parameter
                 all_vectors = np.array([s.vector for s in sessions])
                 logger.info(f"No labels found — training on all {len(sessions)} sessions")
-                self.anomaly_gate.train(all_vectors, all_vectors)
+                self.anomaly_gate.train(all_vectors)
         else:
             self.anomaly_gate.load_model()
 
@@ -456,7 +456,7 @@ def main():
                             help="Load existing model instead of training")
     arg_parser.add_argument("-o", "--output", help="Output results file path",
                             default=None)
-    arg_parser.add_argument("--contamination", type=float, default=0.1,
+    arg_parser.add_argument("--contamination", type=float, default=0.03,
                             help="Isolation Forest contamination parameter")
     arg_parser.add_argument("--window-size", type=int, default=50,
                             help="Sliding window size (BGL/Thunderbird)")
