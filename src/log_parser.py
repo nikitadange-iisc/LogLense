@@ -411,14 +411,27 @@ if __name__ == "__main__":
         choices=["hdfs", "bgl", "thunderbird", "default"],
     )
     ap.add_argument("-n", "--max-lines", type=int, default=None)
+    ap.add_argument("-o", "--output", default=None,
+                    help="Output CSV path (default: data/processed/<stem>_structured.csv)")
     args = ap.parse_args()
 
     from ingestion import stream_deduplicated  # noqa: E402
+    import pandas as pd
 
     parser = LogParser(dataset=args.dataset)
+
+    # Parse and collect all rows
+    rows = []
     count = 0
     for parsed in parser.parse_stream(stream_deduplicated(args.input_file)):
         count += 1
+        rows.append({
+            "LineId": count,
+            "Content": parsed["raw_line"],
+            "EventId": parsed["event_template_id"],
+            "EventTemplate": parsed["event_template"],
+            "Level": parsed["level"],
+        })
         if count <= 5:
             print(
                 f"[{parsed['level']}] Template #{parsed['event_template_id']}: "
@@ -438,3 +451,14 @@ if __name__ == "__main__":
 
     parser.save_state()
 
+    # ── Save structured CSV ───────────────────────────────────────────
+    if args.output:
+        csv_path = Path(args.output)
+    else:
+        input_stem = Path(args.input_file).stem
+        csv_path = Path("../data/processed") / f"{input_stem}_structured.csv"
+
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    df = pd.DataFrame(rows)
+    df.to_csv(csv_path, index=False)
+    print(f"\nStructured CSV saved to: {csv_path}")
