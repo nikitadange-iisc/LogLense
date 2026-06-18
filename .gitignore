@@ -11,12 +11,16 @@ build/
 venv/
 .venv/
 
-# Models & Data
+# Models & Data (reproducible via pipeline)
 models/isolation_forest.joblib
 models/faiss_index/
 models/drain_state/
 data/raw/*.log
+data/raw/*.csv
+data/raw/*.zip
+data/raw/preprocessed/
 !data/raw/sample_hdfs.log
+!data/raw/sample_labels.csv
 data/processed/
 
 # IDE
