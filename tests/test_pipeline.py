@@ -11,6 +11,7 @@ import unittest
 from pathlib import Path
 
 import numpy as np
+from types import SimpleNamespace
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -20,6 +21,8 @@ from log_parser import LogParser
 from sessionizer import Sessionizer, Session
 from anomaly_gate import AnomalyGate
 from module1_ingest_parse import run_module1, CSV_COLUMNS
+from rag_pipeline import RAGPipeline
+from inference_pipeline import analyze_log
 
 
 SAMPLE_HDFS_LOGS = """081109 203518 148 INFO dfs.DataNode$PacketResponder: PacketResponder 1 for block blk_38865049064139660 terminating
@@ -256,6 +259,73 @@ class TestModule1Runner(unittest.TestCase):
         self.assertGreater(result["template_count"], 0)
 
 
+class FakeEmbedder:
+    def embed_session(self, session):
+        return np.array([1.0, 0.0], dtype=np.float32)
+
+
+class FakeVectorStore:
+    def search(self, query_embedding, top_k=3):
+        results = [
+            ({"session_id": "query", "root_cause": "same"}, 0.0),
+            ({"session_id": "hist_1", "root_cause": "Anomaly"}, 0.2),
+            ({"session_id": "hist_2", "root_cause": "Anomaly"}, 0.4),
+            ({"session_id": "hist_3", "root_cause": "Normal"}, 0.9),
+        ]
+        return results[:top_k]
+
+
+class TestRAGPipeline(unittest.TestCase):
+    """Tests for Module 4 retrieval and parsing behavior."""
+
+    def setUp(self):
+        self.rag = RAGPipeline(
+            embedder=FakeEmbedder(),
+            vector_store=FakeVectorStore(),
+            api_key=None,
+        )
+        self.session = SimpleNamespace(
+            session_id="query",
+            raw_lines=["line one", "line two"],
+            line_range=(1, 2),
+            events=[
+                {
+                    "event_template_id": 1,
+                    "event_template": "Receiving block <BLOCK_ID>",
+                    "level": "INFO",
+                },
+                {
+                    "event_template_id": 2,
+                    "event_template": "PacketResponder terminating",
+                    "level": "WARN",
+                },
+            ],
+            anomaly_score=-0.25,
+        )
+
+    def test_retrieve_similar_excludes_self_match(self):
+        results = self.rag.retrieve_similar(self.session, top_k=2)
+        session_ids = [meta["session_id"] for meta, _ in results]
+        self.assertEqual(session_ids, ["hist_1", "hist_2"])
+
+    def test_parse_llm_json_accepts_markdown_fence(self):
+        parsed = self.rag._parse_llm_json('```json\n{"root_cause": "x"}\n```')
+        self.assertEqual(parsed["root_cause"], "x")
+
+    def test_build_prompt_contains_grounding_instructions(self):
+        retrieved = self.rag.retrieve_similar(self.session, top_k=1)
+        prompt = self.rag.build_prompt(self.session, retrieved, top_k=1)
+        self.assertIn("Event Template Sequence", prompt)
+        self.assertIn("Do not invent", prompt)
+        self.assertIn("Retrieval Quality", prompt)
+
+
+class TestInferencePipeline(unittest.TestCase):
+    """Tests for the Module 4 public entry point."""
+
+    def test_analyze_log_is_callable(self):
+        self.assertTrue(callable(analyze_log))
+
+
 if __name__ == "__main__":
     unittest.main()
-

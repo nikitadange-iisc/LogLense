@@ -205,6 +205,10 @@ class LogSensePipeline:
 
         start = time.time()
 
+        if not sessions:
+            logger.warning("No sessions available for anomaly detection")
+            return []
+
         if train:
             # Use labeled normal sessions for training if available
             labeled_normal = [s for s in sessions if s.label and s.label.lower() == "normal"]
@@ -222,6 +226,13 @@ class LogSensePipeline:
             self.anomaly_gate.load_model()
 
         # Filter anomalous sessions
+        vectors = np.array([s.vector for s in sessions])
+        scores = self.anomaly_gate.score(vectors)
+        predictions = self.anomaly_gate.predict(vectors)
+        for session, score, prediction in zip(sessions, scores, predictions):
+            session.anomaly_score = float(score)
+            session.anomaly_prediction = int(prediction)
+
         anomalous = self.anomaly_gate.filter_anomalous(sessions)
 
         # Evaluate if labels are available
@@ -267,12 +278,30 @@ class LogSensePipeline:
             # Build metadata
             metadata_list = []
             for session in anomalous_sessions:
+                event_sequence = []
+                previous = None
+                for event in session.events:
+                    template = event.get("event_template", "")
+                    event_id = event.get("event_template_id", "")
+                    item = f"E{event_id}: {template}" if event_id != "" else template
+                    if item and item != previous:
+                        event_sequence.append(item)
+                        previous = item
+
+                severity_counts = {}
+                for event in session.events:
+                    level = event.get("level", "UNKNOWN")
+                    severity_counts[level] = severity_counts.get(level, 0) + 1
+
                 metadata_list.append({
                     "session_id": session.session_id,
                     "raw_lines": session.raw_lines[:100],  # Limit stored lines
                     "line_range": session.line_range,
                     "label": session.label,
                     "root_cause": session.label if session.label else "Unknown",
+                    "event_sequence": event_sequence[:50],
+                    "severity_counts": severity_counts,
+                    "anomaly_score": getattr(session, "anomaly_score", None),
                 })
 
             # Add to FAISS index
@@ -387,12 +416,31 @@ class LogSensePipeline:
                 sessions_to_analyze,
                 offline=offline_llm
             )
+            latencies = [
+                item.get("latency_sec")
+                for item in analyses
+                if isinstance(item.get("latency_sec"), (int, float))
+            ]
             results["stage6_analysis"] = {
                 "sessions_analyzed": len(analyses),
+                "latency_sec": {
+                    "total": round(sum(latencies), 3) if latencies else 0.0,
+                    "avg_per_session": round(sum(latencies) / len(latencies), 3) if latencies else 0.0,
+                    "max_per_session": round(max(latencies), 3) if latencies else 0.0,
+                },
                 "results": analyses,
             }
         else:
-            results["stage6_analysis"] = {"sessions_analyzed": 0, "results": []}
+            results["stage6_analysis"] = {
+                "sessions_analyzed": 0,
+                "latency_sec": {
+                    "total": 0.0,
+                    "avg_per_session": 0.0,
+                    "max_per_session": 0.0,
+                },
+                "results": [],
+                "note": "No anomalous sessions were available for LLM analysis.",
+            }
 
         # Pipeline summary
         total_duration = round(time.time() - pipeline_start, 2)

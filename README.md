@@ -40,6 +40,9 @@ python pipeline.py ../data/raw/sample_hdfs.log -l ../data/raw/sample_labels.csv 
 # Full pipeline with Anthropic analysis
 python pipeline.py ../data/raw/sample_hdfs.log -l ../data/raw/sample_labels.csv -d hdfs
 
+# Module 4 inference entry point
+python inference_pipeline.py ../data/raw/sample_hdfs.log -l ../data/raw/sample_labels.csv -d hdfs --max-analyze 5
+
 # Run individual stages
 python ingestion.py ../data/raw/sample_hdfs.log
 python parser.py ../data/raw/sample_hdfs.log -n 100
