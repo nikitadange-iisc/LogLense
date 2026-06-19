@@ -4,6 +4,7 @@ Tests for LogSense pipeline stages.
 
 import os
 import sys
+import json
 import tempfile
 import shutil
 import unittest
@@ -18,6 +19,7 @@ from ingestion import read_log_stream, stream_deduplicated, deduplicate_stream
 from log_parser import LogParser
 from sessionizer import Sessionizer, Session
 from anomaly_gate import AnomalyGate
+from module1_ingest_parse import run_module1, CSV_COLUMNS
 
 
 SAMPLE_HDFS_LOGS = """081109 203518 148 INFO dfs.DataNode$PacketResponder: PacketResponder 1 for block blk_38865049064139660 terminating
@@ -192,6 +194,66 @@ class TestAnomalyGate(unittest.TestCase):
         anomalous = gate.filter_anomalous(sessions)
         self.assertGreater(len(anomalous), 0)
         self.assertLess(len(anomalous), len(sessions))
+
+
+class TestModule1Runner(unittest.TestCase):
+    """Tests for the Module 1 end-to-end runner (run_module1)."""
+
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.input_file = os.path.join(self.temp_dir, "sample.log")
+        with open(self.input_file, "w", encoding="utf-8") as f:
+            f.write(SAMPLE_HDFS_LOGS)
+        self.csv_path = os.path.join(self.temp_dir, "out_structured.csv")
+        self.pkl_path = os.path.join(self.temp_dir, "drain.pkl")
+
+        # SAMPLE_HDFS_LOGS has 10 lines; the first two are identical, so
+        # one consecutive duplicate is removed -> 9 kept lines.
+        self.raw_lines = [l for l in SAMPLE_HDFS_LOGS.strip().split("\n") if l.strip()]
+
+    def tearDown(self):
+        shutil.rmtree(self.temp_dir)
+
+    def test_run_module1_outputs_and_summary(self):
+        result = run_module1(
+            input_path=self.input_file,
+            output_csv=self.csv_path,
+            output_pkl=self.pkl_path,
+        )
+
+        # Output files should all exist.
+        json_path = os.path.splitext(self.pkl_path)[0] + ".json"
+        self.assertTrue(os.path.exists(self.csv_path))
+        self.assertTrue(os.path.exists(self.pkl_path))
+        self.assertTrue(os.path.exists(json_path))
+
+        # Dedup counters: 10 read, 1 duplicate removed, 9 kept.
+        self.assertEqual(result["total_lines"], len(self.raw_lines))
+        self.assertEqual(result["duplicates_removed"], 1)
+        self.assertEqual(result["dedup_lines"], len(self.raw_lines) - 1)
+
+        # CSV: header matches the expected columns and has one row per kept line.
+        import csv as _csv
+        with open(self.csv_path, newline="", encoding="utf-8") as f:
+            reader = _csv.reader(f)
+            header = next(reader)
+            rows = list(reader)
+        self.assertEqual(header, CSV_COLUMNS)
+        self.assertEqual(len(rows), result["dedup_lines"])
+
+        # JSON summary should contain the documented keys.
+        with open(json_path, encoding="utf-8") as f:
+            summary = json.load(f)
+        for key in ("dataset", "input_file", "total_lines_scanned",
+                    "deduplicated_lines", "duplicates_removed",
+                    "unique_event_templates", "processing_time_sec",
+                    "lines_per_second", "templates"):
+            self.assertIn(key, summary)
+
+        # Every kept line maps to a template, so the number of distinct
+        # EventIds equals the number of templates Drain discovered.
+        self.assertEqual(result["unique_event_ids"], result["template_count"])
+        self.assertGreater(result["template_count"], 0)
 
 
 if __name__ == "__main__":
