@@ -86,23 +86,26 @@ DRAIN_PROFILES = {
 
 class LogParser:
     """
-    Drain-based log parser with dataset-aware preprocessing.
+    A log parser built on top of Drain3.
 
-    Key improvements over the baseline implementation:
-      1. **Header stripping** — each dataset's structured header (timestamp,
-         PID, node-ID ...) is parsed separately so Drain only sees the
-         free-text content.  This prevents timestamps and PIDs from
-         polluting templates.
-      2. **Severity extraction** — log level (INFO / WARN / ERROR ...) is
-         returned as a first-class field with a numeric severity score,
-         usable downstream for anomaly weighting.
-      3. **Template-aligned variable extraction** — variables are identified
-         by aligning content tokens against the Drain template's <*> slots,
-         rather than relying on a fixed regex list.
-      4. **Full state persistence** — the entire TemplateMiner object is
-         pickled, so templates survive across runs without re-parsing.
-      5. **Per-dataset Drain tuning** — similarity threshold, tree depth
-         and max children are pre-tuned per dataset.
+    The idea is simple: every log line is made of two parts.
+      - a fixed "template"  e.g. "Received block <*> of size <*>"
+      - some variable bits  e.g. the block id, the size, an IP address
+
+    Drain groups lines that share the same template together and gives each
+    template an id. Before handing a line to Drain we do a bit of clean-up
+    so the templates come out nice:
+
+      1. Split off the header (date, time, pid, level, component) so Drain
+         only sees the actual message. Otherwise timestamps and pids would
+         end up inside the templates.
+      2. Keep the log level (INFO / WARN / ERROR ...) and turn it into a
+         small number, which later stages can use to weight anomalies.
+      3. Pull out the variable bits by lining up the line against Drain's
+         <*> wildcards.
+      4. Save the whole Drain model with pickle so we don't have to learn
+         the templates again next time.
+      5. Use slightly different Drain settings per dataset (hdfs/bgl/...).
     """
 
     def __init__(self, dataset: str = "hdfs", config_path: str = None,
@@ -203,9 +206,15 @@ class LogParser:
           3. Extract variables via wildcard (<*>) alignment.
 
         Returns:
-            Dict with keys: event_template_id, event_template,
-            extracted_variables, raw_line, line_number, level,
-            severity_score, component.
+            A dict describing the line. The main keys are:
+              event_template_id   - the template number Drain gave the line
+              event_template      - the template text, e.g. "Received <*>"
+              extracted_variables - the variable bits taken out of the line
+              raw_line, line_number - the original line and its position
+              level, severity_score - log level (INFO/WARN/...) and a number
+              component           - the logging component (if present)
+              date, time, pid, content - the other header fields, passed
+                  through so callers don't have to parse the header again
         """
         self._stats["total_lines"] += 1
 
@@ -236,6 +245,12 @@ class LogParser:
             "level": level,
             "severity_score": SEVERITY_MAP.get(level, -1),
             "component": header.get("component", ""),
+            # Header fields passed through so the Module 1 CSV writer (and
+            # anyone else) doesn't have to parse the header a second time.
+            "date": header.get("date", ""),
+            "time": header.get("time", ""),
+            "pid": header.get("pid", ""),
+            "content": content,
         }
 
     # ── Variable extraction ────────────────────────────────────────────
