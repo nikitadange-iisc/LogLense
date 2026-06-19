@@ -3,7 +3,7 @@ Stage 6: Retrieval-Augmented Agentic Reasoning
 
 At inference, embeds flagged sessions and retrieves top-K similar historical
 failures from FAISS. Assembles a prompt with flagged lines + retrieved examples
-and passes to GPT-4o-mini for root cause identification.
+and passes to Anthropic for root cause identification.
 """
 
 import os
@@ -12,7 +12,6 @@ import logging
 from typing import Optional
 
 from dotenv import load_dotenv
-from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
@@ -44,28 +43,37 @@ You MUST respond with valid JSON in the following format:
 class RAGPipeline:
     """Retrieval-Augmented Generation pipeline for log root cause analysis."""
 
-    def __init__(self, embedder, vector_store, model: str = "gpt-4o-mini",
-                 api_key: str = None):
+    def __init__(self, embedder, vector_store, model: str = "claude-haiku-4-5",
+                 api_key: str = None, provider: str = None):
         """
         Args:
             embedder: SessionEmbedder instance.
             vector_store: FAISSVectorStore instance.
             model: LLM model name.
-            api_key: OpenAI API key (or loaded from .env).
+            api_key: Provider API key (or loaded from .env).
+            provider: "anthropic". If omitted, loaded from LLM_PROVIDER.
         """
         load_dotenv()
 
         self.embedder = embedder
         self.vector_store = vector_store
-        self.model = model or os.getenv("LLM_MODEL", "gpt-4o-mini")
+        self.model = model or os.getenv("LLM_MODEL", "claude-haiku-4-5")
+        self.provider = (provider or os.getenv("LLM_PROVIDER") or "anthropic").lower()
+        if self.provider != "anthropic":
+            raise ValueError(f"Unsupported LLM provider: {self.provider}")
 
-        api_key = api_key or os.getenv("OPENAI_API_KEY")
+        self.client = None
+        api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
         if not api_key:
-            logger.warning("No OpenAI API key found. LLM calls will fail.")
+            logger.warning("No Anthropic API key found. LLM calls will fail.")
+        else:
+            try:
+                from anthropic import Anthropic
+                self.client = Anthropic(api_key=api_key)
+            except ImportError as exc:
+                raise RuntimeError("anthropic package is required for LLM calls.") from exc
 
-        self.client = OpenAI(api_key=api_key) if api_key else None
-
-        logger.info(f"RAGPipeline initialized (model={self.model})")
+        logger.info(f"RAGPipeline initialized (provider={self.provider}, model={self.model})")
 
     def retrieve_similar(self, session, top_k: int = 3) -> list:
         """
@@ -138,7 +146,7 @@ Identify the root cause, provide a line-level failure trace, and respond in the 
 
     def _call_llm(self, prompt: str) -> str:
         """
-        Call the OpenAI API with the assembled prompt.
+        Call the configured LLM API with the assembled prompt.
 
         Args:
             prompt: User prompt string.
@@ -147,24 +155,47 @@ Identify the root cause, provide a line-level failure trace, and respond in the 
             LLM response text.
         """
         if self.client is None:
-            raise RuntimeError("OpenAI client not initialized. Provide an API key.")
+            raise RuntimeError(f"{self.provider} client not initialized. Provide an API key.")
 
         try:
-            response = self.client.chat.completions.create(
+            response = self.client.messages.create(
                 model=self.model,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.2,
                 max_tokens=2000,
-                response_format={"type": "json_object"},
+                temperature=0.2,
+                system=SYSTEM_PROMPT,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": (
+                            prompt
+                            + "\n\nReturn only valid JSON. Do not include markdown fences."
+                        ),
+                    }
+                ],
             )
-            return response.choices[0].message.content
+            return "".join(
+                block.text
+                for block in response.content
+                if getattr(block, "type", None) == "text"
+            )
 
         except Exception as e:
             logger.error(f"LLM API call failed: {e}")
             raise
+
+    @staticmethod
+    def _parse_llm_json(response_text: str) -> dict:
+        """Parse JSON returned directly or inside a markdown code fence."""
+        text = response_text.strip()
+        if text.startswith("```"):
+            lines = text.splitlines()
+            if lines and lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].startswith("```"):
+                lines = lines[:-1]
+            text = "\n".join(lines).strip()
+
+        return json.loads(text)
 
     def analyze(self, session, top_k: int = 3) -> dict:
         """
@@ -190,7 +221,7 @@ Identify the root cause, provide a line-level failure trace, and respond in the 
 
         # Step 4: Parse response
         try:
-            result = json.loads(response_text)
+            result = self._parse_llm_json(response_text)
         except json.JSONDecodeError:
             logger.warning("Failed to parse LLM response as JSON, wrapping as text")
             result = {
@@ -271,4 +302,3 @@ Identify the root cause, provide a line-level failure trace, and respond in the 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
     print("RAG Pipeline module loaded. Use via pipeline.py for end-to-end execution.")
-
