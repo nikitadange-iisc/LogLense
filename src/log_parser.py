@@ -272,7 +272,7 @@ class LogParser:
 
             if len(content_tokens) == len(template_tokens):
                 for ct, tt in zip(content_tokens, template_tokens):
-                    if tt == "<*>":
+                    if re.search(r"<[^>]+>", tt):
                         variables.append(ct)
             else:
                 variables = self._regex_extract(content)
