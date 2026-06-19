@@ -15,8 +15,8 @@ Steps:
        (consecutive-duplicate removal).
     3. Parse each line with Drain3. Drain finds the repeating "template" of
        the line and pulls out the variable bits (block IDs, IPs, numbers).
-    4. Write a structured CSV and save the learned Drain templates so we
-       don't have to learn them again next time.
+    4. Write a structured CSV and save the learned Drain templates (as a
+       pickle + JSON) so other tools can inspect or reuse them.
 
 Files produced:
     data/processed/<name>_structured.csv     one row per log line
@@ -40,9 +40,12 @@ from pathlib import Path
 from collections import Counter
 
 # Make sure we can import the other Module 1 files (ingestion, log_parser)
-# no matter which folder we launch this script from.
+# no matter which folder we launch this script from. Guard against inserting
+# the same path twice so importing this module stays side-effect-light.
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PROJECT_ROOT / "src"))
+_SRC_DIR = str(PROJECT_ROOT / "src")
+if _SRC_DIR not in sys.path:
+    sys.path.insert(0, _SRC_DIR)
 
 from ingestion import read_log_stream
 from log_parser import LogParser
@@ -92,13 +95,14 @@ def run_module1(
     if not input_path.exists():
         raise FileNotFoundError(f"Input file not found: {input_path}")
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    MODEL_DIR.mkdir(parents=True, exist_ok=True)
-
     stem = input_path.stem  # e.g. "HDFS" or "sample_hdfs"
     csv_path = Path(output_csv) if output_csv else OUTPUT_DIR / f"{stem}_structured.csv"
     pkl_path = Path(output_pkl) if output_pkl else MODEL_DIR / "drain_templates.pkl"
     json_path = pkl_path.with_suffix(".json")
+
+    # Make sure the parent folders exist, even for custom output paths.
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    pkl_path.parent.mkdir(parents=True, exist_ok=True)
 
     size_mb = input_path.stat().st_size / (1024 * 1024)
     logger.info("Module 1: Log Ingestion & Drain Parsing")
@@ -120,11 +124,13 @@ def run_module1(
     # We keep a few example rows so we can eyeball that the templates look
     # right. The first 5 lines, plus 5 random lines from the rest chosen
     # with "reservoir sampling" (a simple way to pick random items in a
-    # single pass without storing the whole file).
+    # single pass without storing the whole file). We use a local RNG with
+    # a fixed seed so the spot-checks are reproducible without touching the
+    # global random state that the rest of the pipeline may rely on.
     head_rows = []
     reservoir = []
     seen_after_head = 0
-    random.seed(42)
+    rng = random.Random(42)
 
     t0 = time.time()
     with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
@@ -171,7 +177,7 @@ def run_module1(
                 if len(reservoir) < 5:
                     reservoir.append(row)
                 else:
-                    j = random.randint(0, seen_after_head - 1)
+                    j = rng.randint(0, seen_after_head - 1)
                     if j < 5:
                         reservoir[j] = row
 
