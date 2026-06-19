@@ -195,7 +195,9 @@ def run_module1(
     # ---- Save the Drain model so later runs can reuse the templates ----
     logger.info("Saving Drain state...")
     with open(pkl_path, "wb") as f:
-        pickle.dump(parser.template_miner, f)
+        # HIGHEST_PROTOCOL gives a smaller file and faster read/write,
+        # which matters when there are lots of templates.
+        pickle.dump(parser.template_miner, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     templates = parser.get_templates()
     summary = {
@@ -216,7 +218,9 @@ def run_module1(
             for t in sorted(templates, key=lambda x: x["cluster_id"])
         ],
     }
-    with open(json_path, "w") as f:
+    # encoding="utf-8" keeps the output the same on Windows, Linux and Mac
+    # (Windows would otherwise use its local code page).
+    with open(json_path, "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
     logger.info("Saved: %s, %s", pkl_path.name, json_path.name)
 
