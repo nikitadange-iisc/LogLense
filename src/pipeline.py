@@ -117,7 +117,8 @@ class LogSensePipeline:
             self._rag_pipeline = RAGPipeline(
                 embedder=self.embedder,
                 vector_store=self.vector_store,
-                model=self.config.get("llm_model", "gpt-4o-mini"),
+                model=self.config.get("llm_model", "claude-haiku-4-5"),
+                provider=self.config.get("llm_provider"),
             )
         return self._rag_pipeline
 
@@ -462,6 +463,11 @@ def main():
                             help="Sliding window size (BGL/Thunderbird)")
     arg_parser.add_argument("--top-k", type=int, default=3,
                             help="Number of similar examples to retrieve")
+    arg_parser.add_argument("--llm-provider", choices=["anthropic"],
+                            default=os.getenv("LLM_PROVIDER", "anthropic"),
+                            help="LLM provider for Stage 6")
+    arg_parser.add_argument("--llm-model", default=os.getenv("LLM_MODEL", "claude-haiku-4-5"),
+                            help="LLM model name for Stage 6")
     arg_parser.add_argument("-v", "--verbose", action="store_true",
                             help="Enable verbose logging")
 
@@ -484,6 +490,8 @@ def main():
         "contamination": args.contamination,
         "window_size": args.window_size,
         "top_k": args.top_k,
+        "llm_provider": args.llm_provider,
+        "llm_model": args.llm_model,
     }
 
     # Run pipeline
@@ -510,4 +518,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
