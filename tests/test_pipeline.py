@@ -10,6 +10,7 @@ import unittest
 from pathlib import Path
 
 import numpy as np
+from types import SimpleNamespace
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -196,4 +197,3 @@ class TestAnomalyGate(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

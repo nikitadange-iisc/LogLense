@@ -14,6 +14,7 @@ Provider selection (auto-detect order):
 import os
 import json
 import logging
+import time
 from typing import Optional
 
 from dotenv import load_dotenv
@@ -154,7 +155,9 @@ class RAGPipeline:
 
     # ── Retrieval ──────────────────────────────────────────────────────────
 
-    def retrieve_similar(self, session, top_k: int = 3) -> list:
+    def retrieve_similar(self, session, top_k: int = 3,
+                         exclude_self: bool = True,
+                         extra_candidates: int = 5) -> list:
         """
         Embed session and retrieve top-K nearest anomalies from FAISS.
 
@@ -199,6 +202,9 @@ Total lines   : {len(session.raw_lines or [])}
 ```
 {flagged_lines}
 ```
+
+### Retrieval Quality:
+{json.dumps(retrieval_quality, indent=2)}
 """
 
         if retrieved_examples:
@@ -253,6 +259,9 @@ Identify the root cause and respond with the required JSON structure.
         else:  # openai
             response = self._client.chat.completions.create(
                 model=self.model,
+                max_tokens=2000,
+                temperature=0.2,
+                system=SYSTEM_PROMPT,
                 messages=[
                     {"role": "system", "content": sys_prompt},
                     {"role": "user",   "content": prompt},
@@ -261,9 +270,27 @@ Identify the root cause and respond with the required JSON structure.
                 max_tokens=2048,
                 response_format={"type": "json_object"},
             )
-            return response.choices[0].message.content
+            return "".join(
+                block.text
+                for block in response.content
+                if getattr(block, "type", None) == "text"
+            )
 
     # ── Analysis methods ───────────────────────────────────────────────────
+
+    @staticmethod
+    def _parse_llm_json(response_text: str) -> dict:
+        """Parse JSON returned directly or inside a markdown code fence."""
+        text = response_text.strip()
+        if text.startswith("```"):
+            lines = text.splitlines()
+            if lines and lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].startswith("```"):
+                lines = lines[:-1]
+            text = "\n".join(lines).strip()
+
+        return json.loads(text)
 
     def analyze(self, session, top_k: int = 3) -> dict:
         """
@@ -333,6 +360,7 @@ Identify the root cause and respond with the required JSON structure.
         Returns:
             Dict with retrieved examples, built prompt, and session metadata.
         """
+        started = time.time()
         retrieved = self.retrieve_similar(session, top_k=top_k)
         prompt    = self.build_prompt(session, retrieved)
 
