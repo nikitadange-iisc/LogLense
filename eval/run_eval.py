@@ -142,24 +142,20 @@ def cmd_gate(args) -> None:
     ground_truth = get_label_map(golden)
     logger.info(f"Loaded {len(ground_truth)} ground-truth labels")
 
-    pipeline = LogSensePipeline(config={"dataset_type": "hdfs"})
-    pipeline.stage1_parse(args.log_file)
-    pipeline.stage2_extract_templates()
-    pipeline.stage3_sessionize()
-    pipeline.stage4_vectorize()
-    pipeline.stage5_train_and_predict()
+    # Use the labels file matching the log file if available alongside the log
+    labels_path = args.labels if hasattr(args, "labels") and args.labels else None
 
-    sessions = pipeline.sessions or []
+    p = LogSensePipeline(config={"dataset_type": "hdfs"})
+    parsed_events = p.run_parsing(args.log_file)
+    sessions, _ = p.run_sessionization(parsed_events, label_path=labels_path)
+    p.run_anomaly_gate(sessions, train=True)
+
+    # Build predictions: anomaly_prediction == -1 means anomalous (IsolationForest convention)
     predictions = {}
     for session in sessions:
-        label = getattr(session, "label", None)
-        if label:
-            predictions[session.session_id] = label
-        # Fallback: use anomaly_score threshold if label not set
-        elif hasattr(session, "anomaly_score"):
-            score = session.anomaly_score
-            if score is not None:
-                predictions[session.session_id] = "Anomaly" if score < 0 else "Normal"
+        pred = getattr(session, "anomaly_prediction", None)
+        if pred is not None:
+            predictions[session.session_id] = "Anomaly" if pred == -1 else "Normal"
 
     metrics = compute_gate_metrics(predictions, ground_truth)
     _print_gate_report(metrics)
@@ -240,22 +236,25 @@ def cmd_full(args) -> None:
     target_ids = anomaly_ids[:args.max_sessions] if args.max_sessions else anomaly_ids
     logger.info(f"Running inference on {len(target_ids)} anomalous sessions...")
 
-    report = analyze_log(
-        filepath=args.log_file,
-        labels_path=args.labels,
-        dataset="hdfs",
-        max_analyze=len(target_ids),
+    from pipeline import LogSensePipeline  # noqa: E402
+
+    # Run pipeline stages manually to retain session objects for gate metrics
+    p = LogSensePipeline(config={"dataset_type": "hdfs"})
+    parsed_events = p.run_parsing(args.log_file)
+    sessions, _ = p.run_sessionization(parsed_events, label_path=args.labels)
+    anomalous = p.run_anomaly_gate(sessions, train=True)
+    p.run_embedding_indexing(anomalous)
+    analyses = p.run_rag_analysis(
+        anomalous[:args.max_sessions] if args.max_sessions else anomalous,
         offline=False,
     )
-    analyses = report.get("stage6_analysis", {}).get("analyses", [])
-    all_sessions = report.get("pipeline_results", {}).get("sessions", [])
 
     # --- Gate metrics ---
     gate_predictions = {}
-    for session in all_sessions:
-        label = getattr(session, "label", None)
-        if label:
-            gate_predictions[session.session_id] = label
+    for session in sessions:
+        pred = getattr(session, "anomaly_prediction", None)
+        if pred is not None:
+            gate_predictions[session.session_id] = "Anomaly" if pred == -1 else "Normal"
     gate_metrics = compute_gate_metrics(gate_predictions, ground_truth)
 
     # --- LLM judge scores ---
@@ -332,6 +331,7 @@ def build_parser() -> argparse.ArgumentParser:
     # gate
     p_gate = sub.add_parser("gate", help="Evaluate anomaly gate (no API key needed)")
     p_gate.add_argument("--log-file", required=True)
+    p_gate.add_argument("--labels", default=None, help="Path to anomaly_label.csv for supervised gate training")
     p_gate.add_argument("--golden", default="eval/data/golden_dataset.json")
     p_gate.add_argument("--output", default=None)
 
