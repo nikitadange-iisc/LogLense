@@ -202,9 +202,6 @@ Total lines   : {len(session.raw_lines or [])}
 ```
 {flagged_lines}
 ```
-
-### Retrieval Quality:
-{json.dumps(retrieval_quality, indent=2)}
 """
 
         if retrieved_examples:
@@ -259,22 +256,15 @@ Identify the root cause and respond with the required JSON structure.
         else:  # openai
             response = self._client.chat.completions.create(
                 model=self.model,
-                max_tokens=2000,
+                max_tokens=2048,
                 temperature=0.2,
-                system=SYSTEM_PROMPT,
                 messages=[
                     {"role": "system", "content": sys_prompt},
                     {"role": "user",   "content": prompt},
                 ],
-                temperature=0.2,
-                max_tokens=2048,
                 response_format={"type": "json_object"},
             )
-            return "".join(
-                block.text
-                for block in response.content
-                if getattr(block, "type", None) == "text"
-            )
+            return response.choices[0].message.content
 
     # ── Analysis methods ───────────────────────────────────────────────────
 
