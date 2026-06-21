@@ -204,7 +204,7 @@ Total lines   : {len(session.raw_lines or [])}
 ```
 
 ### Retrieval Quality:
-{json.dumps(retrieval_quality, indent=2)}
+{json.dumps({"retrieved_count": len(retrieved_examples), "top_distance": round(float(retrieved_examples[0][1]), 4) if retrieved_examples else None}, indent=2)}
 """
 
         if retrieved_examples:
@@ -266,8 +266,6 @@ Identify the root cause and respond with the required JSON structure.
                     {"role": "system", "content": sys_prompt},
                     {"role": "user",   "content": prompt},
                 ],
-                temperature=0.2,
-                max_tokens=2048,
                 response_format={"type": "json_object"},
             )
             return "".join(
