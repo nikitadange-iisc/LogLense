@@ -1,23 +1,39 @@
 """
-Stage 3: Session Grouping & Vectorization
+Module 2a - Session Grouping & Vectorization
+=============================================
 
-Groups parsed log events into sessions:
-  - HDFS: group by Block ID
-  - BGL/Thunderbird: group by sliding window of N events
-Represents each session as a fixed-length event count vector.
+Groups parsed log events (read from Module 1 CSV) into sessions:
+  - HDFS        : group by Block ID extracted from ParameterList / Content
+  - BGL         : group by Node column (concentrates fault bursts per node)
+  - Thunderbird : sliding window of window_size events, step step_size
+
+Represents each session as a fixed-length event-count vector over the
+global template vocabulary, then optionally attaches ground-truth labels.
+
+Label strategies:
+  - HDFS        : load from anomaly_label.csv (BlockId, Label)
+  - BGL / TB    : derive from the 'Label' column already in the Module 1 CSV
+                  (any event with label != '-' marks the session as Anomaly)
 """
 
-import re
+import ast
+import csv
+import json
 import logging
-import argparse
-from dataclasses import dataclass, field
-from typing import Optional
+import re
 from collections import defaultdict
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Optional
 
 import numpy as np
 
 logger = logging.getLogger(__name__)
 
+
+# ---------------------------------------------------------------------------
+# Data class
+# ---------------------------------------------------------------------------
 
 @dataclass
 class Session:
@@ -27,264 +43,353 @@ class Session:
     line_range: tuple = (0, 0)
     raw_lines: list = field(default_factory=list)
     vector: Optional[np.ndarray] = None
-    label: Optional[str] = None  # Ground-truth label: "Normal" or "Anomaly"
+    label: Optional[str] = None   # "Normal" | "Anomaly" | None
 
+
+# ---------------------------------------------------------------------------
+# CSV → event-dict loader (Module 1 output → Module 2 input)
+# ---------------------------------------------------------------------------
+
+def load_events_from_csv(csv_path: str, dataset: str) -> list:
+    """
+    Read a Module 1 structured CSV and return a list of event dicts
+    compatible with Sessionizer methods.
+
+    Each event dict contains:
+        event_template_id : int   (parsed from "E5" -> 5)
+        event_template    : str
+        extracted_variables: list (ast.literal_eval of ParameterList)
+        line_number       : int
+        content           : str   (the log message, used as raw_line proxy)
+        raw_line          : str   (alias of content, for embed / block-ID fallback)
+        level             : str
+        label             : str   (BGL / Thunderbird only; '-' for normal)
+        ... other dataset-specific columns lowercased
+    """
+    events = []
+    with open(csv_path, newline="", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            event_id_str = row.get("EventId", "E0")
+            try:
+                template_id = int(event_id_str.lstrip("E"))
+            except ValueError:
+                template_id = 0
+
+            param_str = row.get("ParameterList", "[]")
+            try:
+                variables = ast.literal_eval(param_str)
+                if not isinstance(variables, list):
+                    variables = []
+            except Exception:
+                variables = []
+
+            content = row.get("Content", "")
+            event = {
+                "event_template_id":  template_id,
+                "event_template":     row.get("EventTemplate", ""),
+                "extracted_variables": variables,
+                "line_number":        int(row.get("LineId", 0)),
+                "content":            content,
+                "raw_line":           content,   # best proxy for embedding & block-ID regex
+                "level":              row.get("Level", ""),
+                # carry the anomaly label for BGL / Thunderbird
+                "label":              row.get("Label", "-"),
+            }
+
+            # Pass through any extra dataset columns (lowercased)
+            for col, val in row.items():
+                key = col.lower()
+                if key not in event:
+                    event[key] = val
+
+            events.append(event)
+
+    logger.info("Loaded %d events from %s (dataset=%s)", len(events), csv_path, dataset)
+    return events
+
+
+# ---------------------------------------------------------------------------
+# Sessionizer
+# ---------------------------------------------------------------------------
 
 class Sessionizer:
     """Groups parsed log events into sessions and vectorizes them."""
 
-    def __init__(self, method: str = "block_id", window_size: int = 50,
-                 step_size: int = 25):
+    def __init__(self, method: str = "block_id", window_size: int = 20,
+                 step_size: int = 10, weighting: str = "count"):
         """
         Args:
-            method: "block_id" for HDFS, "sliding_window" for BGL/Thunderbird.
-            window_size: Number of events per sliding window.
-            step_size: Step size for sliding window.
+            method      : "block_id" | "node" | "sliding_window"
+            window_size : Events per sliding window (default 20 per paper).
+            step_size   : Stride for sliding window (default 10 = 50% overlap).
+            weighting   : "count" (raw event counts, default) or "tfidf"
+                          (TF-IDF weights — upweights rare fault templates).
         """
-        self.method = method
+        if weighting not in ("count", "tfidf"):
+            raise ValueError(f"weighting must be 'count' or 'tfidf', got {weighting!r}")
+        self.method      = method
         self.window_size = window_size
-        self.step_size = step_size
-        logger.info(f"Sessionizer initialized (method={method})")
+        self.step_size   = step_size
+        self.weighting   = weighting
+        logger.info("Sessionizer initialized (method=%s, window=%d, step=%d, weighting=%s)",
+                    method, window_size, step_size, weighting)
 
-    def extract_block_id(self, parsed_event: dict) -> str:
-        """
-        Extract HDFS block ID from a parsed event.
+    # ── Block-ID helpers (HDFS) ─────────────────────────────────────────
 
-        Args:
-            parsed_event: Dict from parser stage with extracted_variables and raw_line.
-
-        Returns:
-            Block ID string or None if not found.
-        """
-        # Check extracted variables first
-        for var in parsed_event.get("extracted_variables", []):
+    def extract_block_id(self, event: dict) -> Optional[str]:
+        """Extract HDFS block ID from extracted_variables or raw_line."""
+        for var in event.get("extracted_variables", []):
             if isinstance(var, str) and var.startswith("blk_"):
                 return var
-
-        # Fallback: regex on raw line
-        match = re.search(r"(blk_-?\d+)", parsed_event.get("raw_line", ""))
+        match = re.search(r"(blk_-?\d+)", event.get("raw_line", ""))
         if match:
             return match.group(1)
-
         return None
 
-    def group_by_block_id(self, parsed_events) -> dict:
-        """
-        Group parsed events by HDFS Block ID.
-
-        Args:
-            parsed_events: Iterable of parsed event dicts.
-
-        Returns:
-            Dict mapping block_id -> list of parsed events.
-        """
+    def group_by_block_id(self, events) -> dict:
         groups = defaultdict(list)
-        no_block_count = 0
-
-        for event in parsed_events:
-            block_id = self.extract_block_id(event)
-            if block_id:
-                groups[block_id].append(event)
+        skipped = 0
+        for event in events:
+            bid = self.extract_block_id(event)
+            if bid:
+                groups[bid].append(event)
             else:
-                no_block_count += 1
-
-        if no_block_count:
-            logger.warning(f"{no_block_count} events had no block ID and were skipped")
-
-        logger.info(f"Grouped events into {len(groups)} block-ID sessions")
+                skipped += 1
+        if skipped:
+            logger.warning("%d events had no block ID and were skipped", skipped)
+        logger.info("Grouped events into %d block-ID sessions", len(groups))
         return dict(groups)
 
-    def group_by_sliding_window(self, parsed_events) -> list:
-        """
-        Group parsed events using a sliding window approach.
+    # ── Node helper (BGL) ──────────────────────────────────────────────
 
-        Args:
-            parsed_events: Iterable of parsed event dicts.
+    def group_by_node(self, events) -> dict:
+        """Group events by the Node column — keeps all fault events for a
+        node together so the anomaly signal is not diluted across windows."""
+        groups = defaultdict(list)
+        skipped = 0
+        for event in events:
+            node = event.get("node", "").strip()
+            if not node:
+                skipped += 1
+                continue
+            groups[node].append(event)
+        if skipped:
+            logger.warning("%d events had no Node field and were skipped", skipped)
+        logger.info("Grouped events into %d node sessions", len(groups))
+        return dict(groups)
 
-        Returns:
-            List of session dicts with session_id, events, line_range.
-        """
-        # Materialize the events for windowing
-        all_events = list(parsed_events)
+    # ── Sliding-window helper (Thunderbird) ─────────────────────────────
+
+    def group_by_sliding_window(self, events) -> list:
+        all_events = list(events)
         sessions = []
-
-        for i in range(0, max(1, len(all_events) - self.window_size + 1), self.step_size):
-            window = all_events[i:i + self.window_size]
+        n = len(all_events)
+        for i in range(0, max(1, n - self.window_size + 1), self.step_size):
+            window = all_events[i: i + self.window_size]
             if not window:
                 continue
-
             line_numbers = [e.get("line_number", 0) for e in window if e.get("line_number")]
-            line_range = (min(line_numbers) if line_numbers else i,
-                          max(line_numbers) if line_numbers else i + len(window))
-
+            line_range = (
+                min(line_numbers) if line_numbers else i,
+                max(line_numbers) if line_numbers else i + len(window),
+            )
             sessions.append({
                 "session_id": f"window_{i}_{i + len(window)}",
-                "events": window,
+                "events":     window,
                 "line_range": line_range,
             })
-
-        logger.info(f"Created {len(sessions)} sliding-window sessions "
-                     f"(window={self.window_size}, step={self.step_size})")
+        logger.info("Created %d sliding-window sessions (window=%d, step=%d)",
+                    len(sessions), self.window_size, self.step_size)
         return sessions
 
-    def build_template_vocabulary(self, sessions: list) -> dict:
+    # ── Session creation ────────────────────────────────────────────────
+
+    def create_sessions(self, events) -> list:
         """
-        Build a global vocabulary of unique event template IDs.
+        Create Session objects using the configured method.
 
         Args:
-            sessions: List of Session objects.
+            events: Iterable of event dicts (from load_events_from_csv or parser).
 
         Returns:
-            Dict mapping template_id -> vector index.
-        """
-        template_ids = set()
-        for session in sessions:
-            for event in session.events:
-                template_ids.add(event["event_template_id"])
-
-        vocabulary = {tid: idx for idx, tid in enumerate(sorted(template_ids))}
-        logger.info(f"Built template vocabulary with {len(vocabulary)} unique templates")
-        return vocabulary
-
-    def vectorize_session(self, session_events: list, vocabulary: dict) -> np.ndarray:
-        """
-        Convert a session's events into a fixed-length count vector.
-
-        Args:
-            session_events: List of parsed event dicts.
-            vocabulary: Dict mapping template_id -> vector index.
-
-        Returns:
-            Numpy array of event counts.
-        """
-        vector = np.zeros(len(vocabulary), dtype=np.float32)
-        for event in session_events:
-            tid = event["event_template_id"]
-            if tid in vocabulary:
-                vector[vocabulary[tid]] += 1
-        return vector
-
-    def create_sessions(self, parsed_events) -> list:
-        """
-        Create Session objects from parsed events using the configured method.
-
-        Args:
-            parsed_events: Iterable of parsed event dicts.
-
-        Returns:
-            List of Session objects.
+            List of Session objects (no vectors yet).
         """
         sessions = []
-
         if self.method == "block_id":
-            groups = self.group_by_block_id(parsed_events)
-            for block_id, events in groups.items():
-                line_numbers = [e.get("line_number", 0) for e in events if e.get("line_number")]
-                line_range = (min(line_numbers) if line_numbers else 0,
-                              max(line_numbers) if line_numbers else 0)
-                raw_lines = [e["raw_line"] for e in events]
-
+            groups = self.group_by_block_id(events)
+            for bid, evts in groups.items():
+                line_nums = [e.get("line_number", 0) for e in evts if e.get("line_number")]
                 sessions.append(Session(
-                    session_id=block_id,
-                    events=events,
-                    line_range=line_range,
-                    raw_lines=raw_lines,
+                    session_id=bid,
+                    events=evts,
+                    line_range=(min(line_nums, default=0), max(line_nums, default=0)),
+                    raw_lines=[e["raw_line"] for e in evts],
+                ))
+        elif self.method == "node":
+            groups = self.group_by_node(events)
+            for node, evts in groups.items():
+                line_nums = [e.get("line_number", 0) for e in evts if e.get("line_number")]
+                sessions.append(Session(
+                    session_id=node,
+                    events=evts,
+                    line_range=(min(line_nums, default=0), max(line_nums, default=0)),
+                    raw_lines=[e["raw_line"] for e in evts],
                 ))
         elif self.method == "sliding_window":
-            window_groups = self.group_by_sliding_window(parsed_events)
-            for wg in window_groups:
-                raw_lines = [e["raw_line"] for e in wg["events"]]
+            for wg in self.group_by_sliding_window(events):
                 sessions.append(Session(
                     session_id=wg["session_id"],
                     events=wg["events"],
                     line_range=wg["line_range"],
-                    raw_lines=raw_lines,
+                    raw_lines=[e["raw_line"] for e in wg["events"]],
                 ))
         else:
             raise ValueError(f"Unknown sessionization method: {self.method}")
 
-        logger.info(f"Created {len(sessions)} sessions using '{self.method}' method")
+        logger.info("Created %d sessions via '%s'", len(sessions), self.method)
         return sessions
+
+    # ── Vectorization ───────────────────────────────────────────────────
+
+    def build_template_vocabulary(self, sessions: list) -> dict:
+        """Build vocabulary: template_id (int) -> vector index."""
+        template_ids = set()
+        for s in sessions:
+            for e in s.events:
+                template_ids.add(e["event_template_id"])
+        vocab = {tid: idx for idx, tid in enumerate(sorted(template_ids))}
+        logger.info("Built vocabulary: %d unique templates", len(vocab))
+        return vocab
+
+    def build_idf(self, sessions: list, vocabulary: dict) -> np.ndarray:
+        """
+        Compute smooth IDF weights across all sessions.
+        IDF(t) = log((1 + N) / (1 + df(t))) + 1  [sklearn smooth formula]
+        Rare templates (fault events) get high weight; frequent ones (E1) get low weight.
+        """
+        N = len(sessions)
+        df = np.zeros(len(vocabulary), dtype=np.float32)
+        for s in sessions:
+            seen_in_session = set()
+            for e in s.events:
+                idx = vocabulary.get(e["event_template_id"])
+                if idx is not None and idx not in seen_in_session:
+                    df[idx] += 1
+                    seen_in_session.add(idx)
+        idf = np.log((1.0 + N) / (1.0 + df)) + 1.0
+        logger.info("IDF computed over %d sessions — min=%.3f max=%.3f",
+                    N, float(idf.min()), float(idf.max()))
+        return idf
+
+    def vectorize_session(self, events: list, vocabulary: dict,
+                          idf: np.ndarray = None) -> np.ndarray:
+        """
+        Build a vector for one session.
+        - weighting='count' (idf=None): raw event counts.
+        - weighting='tfidf' (idf provided): binary presence × IDF.
+          Uses binary (0/1) instead of raw counts before multiplying by IDF.
+          This removes session-length bias — a node with 4865 E1 events and a
+          node with 1 E1 event produce the same E1 contribution. The key signal
+          for short sessions (BGL avg 4 events/node) is WHICH templates appeared,
+          not how many times, so binary representation is more discriminative.
+        """
+        vec = np.zeros(len(vocabulary), dtype=np.float32)
+        for e in events:
+            idx = vocabulary.get(e["event_template_id"])
+            if idx is not None:
+                vec[idx] += 1
+        if idf is not None:
+            # Binary presence × IDF: 1 if template appeared, 0 otherwise
+            vec = (vec > 0).astype(np.float32) * idf
+        return vec
 
     def vectorize_all(self, sessions: list, vocabulary: dict = None):
         """
-        Vectorize all sessions.
-
-        Args:
-            sessions: List of Session objects.
-            vocabulary: Optional pre-built vocabulary. If None, built from sessions.
+        Vectorize all sessions using the configured weighting scheme.
 
         Returns:
-            Tuple of (sessions_with_vectors, vocabulary).
+            (sessions_with_vectors, vocabulary)
         """
         if vocabulary is None:
             vocabulary = self.build_template_vocabulary(sessions)
 
-        for session in sessions:
-            session.vector = self.vectorize_session(session.events, vocabulary)
+        idf = self.build_idf(sessions, vocabulary) if self.weighting == "tfidf" else None
 
-        logger.info(f"Vectorized {len(sessions)} sessions (vector dim={len(vocabulary)})")
+        for s in sessions:
+            s.vector = self.vectorize_session(s.events, vocabulary, idf=idf)
+        logger.info("Vectorized %d sessions (dim=%d, weighting=%s)",
+                    len(sessions), len(vocabulary), self.weighting)
         return sessions, vocabulary
+
+    # ── Vocabulary persistence ──────────────────────────────────────────
+
+    def save_vocabulary(self, vocabulary: dict, path: str,
+                        idf: np.ndarray = None) -> None:
+        """Save event-template vocabulary (and optional IDF weights) to JSON."""
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "event_id_to_index": {str(k): v for k, v in vocabulary.items()},
+            "template_count":    len(vocabulary),
+            "weighting":         self.weighting,
+        }
+        if idf is not None:
+            payload["idf_weights"] = idf.tolist()
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2)
+        logger.info("Vocabulary saved: %d templates -> %s", len(vocabulary), path)
+
+    def load_vocabulary(self, path: str):
+        """
+        Load vocabulary from JSON.
+        Returns:
+            (vocabulary dict, idf np.ndarray or None)
+        """
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        raw = data.get("event_id_to_index", data)
+        vocab = {int(k): v for k, v in raw.items()}
+        idf = np.array(data["idf_weights"], dtype=np.float32) if "idf_weights" in data else None
+        logger.info("Vocabulary loaded: %d templates from %s (weighting=%s)",
+                    len(vocab), path, data.get("weighting", "count"))
+        return vocab, idf
+
+    # ── Label assignment ────────────────────────────────────────────────
 
     def load_labels(self, label_path: str, sessions: list) -> list:
         """
-        Load ground-truth anomaly labels and attach to sessions.
-        Supports HDFS anomaly_label.csv format (BlockId, Label).
+        Attach ground-truth labels to HDFS sessions from anomaly_label.csv.
+        Format: BlockId,Label  (header row, then one block per line).
 
-        Args:
-            label_path: Path to label file.
-            sessions: List of Session objects.
-
-        Returns:
-            Updated sessions with labels.
+        For BGL / Thunderbird use assign_labels_from_events() instead —
+        the labels are already embedded in each event's 'label' field.
         """
         labels = {}
-        with open(label_path, "r") as f:
-            header = f.readline()  # Skip header
+        with open(label_path, encoding="utf-8") as f:
+            next(f)  # skip header
             for line in f:
                 parts = line.strip().split(",")
                 if len(parts) >= 2:
-                    block_id = parts[0].strip()
-                    label = parts[1].strip()
-                    labels[block_id] = label
+                    labels[parts[0].strip()] = parts[1].strip()
 
-        labeled_count = 0
-        for session in sessions:
-            if session.session_id in labels:
-                session.label = labels[session.session_id]
-                labeled_count += 1
+        matched = 0
+        for s in sessions:
+            if s.session_id in labels:
+                s.label = labels[s.session_id]
+                matched += 1
 
-        logger.info(f"Loaded labels for {labeled_count}/{len(sessions)} sessions "
-                     f"({len(labels)} labels in file)")
+        logger.info("Loaded labels for %d/%d sessions (%d in file)",
+                    matched, len(sessions), len(labels))
         return sessions
 
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-
-    arg_parser = argparse.ArgumentParser(description="Stage 3: Session Grouping & Vectorization")
-    arg_parser.add_argument("input_file", help="Path to log file")
-    arg_parser.add_argument("-m", "--method", default="block_id",
-                            choices=["block_id", "sliding_window"])
-    arg_parser.add_argument("-n", "--max-lines", type=int, default=1000)
-    args = arg_parser.parse_args()
-
-    from ingestion import stream_deduplicated
-    from log_parser import LogParser
-
-    parser = LogParser()
-    parsed = list(parser.parse_stream(stream_deduplicated(args.input_file)))
-    if args.max_lines:
-        parsed = parsed[:args.max_lines]
-
-    sessionizer = Sessionizer(method=args.method)
-    sessions = sessionizer.create_sessions(iter(parsed))
-    sessions, vocab = sessionizer.vectorize_all(sessions)
-
-    print(f"\nSessions created: {len(sessions)}")
-    print(f"Vocabulary size: {len(vocab)}")
-    if sessions:
-        print(f"Sample session: {sessions[0].session_id}, "
-              f"vector shape: {sessions[0].vector.shape}, "
-              f"lines: {len(sessions[0].raw_lines)}")
-
+    def assign_labels_from_events(self, sessions: list) -> list:
+        """
+        Derive session labels from event-level 'label' fields (BGL / Thunderbird).
+        A session is 'Anomaly' if ANY constituent event has label != '-'.
+        """
+        for s in sessions:
+            event_labels = [e.get("label", "-") for e in s.events]
+            s.label = "Anomaly" if any(lbl != "-" for lbl in event_labels) else "Normal"
+        anomalous = sum(1 for s in sessions if s.label == "Anomaly")
+        logger.info("Labels derived from events: %d Anomaly / %d Normal",
+                    anomalous, len(sessions) - anomalous)
+        return sessions
