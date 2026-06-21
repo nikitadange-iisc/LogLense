@@ -43,3 +43,4 @@ results_*.json
 data/raw/*.tar.gz
 data/raw/*.log
 data/raw/HDFS*
+src/models/
