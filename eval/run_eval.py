@@ -243,9 +243,13 @@ def cmd_full(args) -> None:
     parsed_events = p.run_parsing(args.log_file)
     sessions, _ = p.run_sessionization(parsed_events, label_path=args.labels)
     anomalous = p.run_anomaly_gate(sessions, train=True)
-    p.run_embedding_indexing(anomalous)
+    # Cap embedding pool: only embed sessions needed for analysis + small retrieval pool.
+    # Embedding all 95K flagged sessions takes 30+ mins and OOMs on MPS.
+    n_analyze = args.max_sessions or len(anomalous)
+    embed_pool = anomalous[:max(n_analyze * 10, 100)]
+    p.run_embedding_indexing(embed_pool)
     analyses = p.run_rag_analysis(
-        anomalous[:args.max_sessions] if args.max_sessions else anomalous,
+        anomalous[:n_analyze],
         offline=False,
     )
 
