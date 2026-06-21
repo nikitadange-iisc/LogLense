@@ -1,0 +1,8 @@
+# LogLense Evaluation Pipeline — additional dependencies
+# Install alongside the root requirements.txt:
+#   uv pip install -r eval/requirements.txt
+
+langchain>=0.3.0
+langchain-core>=0.3.0
+langchain-anthropic>=0.3.0
+langsmith>=0.2.0
