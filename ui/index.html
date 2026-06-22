@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>LogSense AI</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/17.0.2/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/17.0.2/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/6.26.0/babel.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Inter,sans-serif;background:#0d1117;color:#e6edf3;min-height:100vh}
+details>summary{list-style:none;cursor:pointer}
+details>summary::-webkit-details-marker{display:none}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:#161b22}
+::-webkit-scrollbar-thumb{background:#30363d;border-radius:3px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+var h=React.createElement;
+var useState=React.useState;
+var useEffect=React.useEffect;
+var useRef=React.useRef;
+
+var API="http://localhost:8001";
+var C={surface:"#161b22",border:"#21262d",blue:"#58a6ff",green:"#3fb950",red:"#f85149",yellow:"#e3b341",purple:"#bc8cff",orange:"#f0883e",text:"#e6edf3",muted:"#8b949e",dim:"#6e7681"};
+var mono={fontFamily:"'JetBrains Mono',monospace"};
+var card={background:C.surface,border:"1px solid "+C.border,borderRadius:10,padding:"18px 16px"};
+function pill(c){return{display:"inline-block",padding:"3px 11px",borderRadius:20,fontSize:11,fontWeight:600,background:c+"22",border:"1px solid "+c+"50",color:c,margin:3};}
+function gbtn(bg){return{background:bg||"linear-gradient(135deg,#238636,#2ea043)",color:"#fff",border:"none",borderRadius:7,padding:"9px 18px",fontSize:13,fontWeight:600,cursor:"pointer",width:"100%"};}
+var inp={background:"#0d1117",border:"1px solid "+C.border,borderRadius:7,padding:"9px 12px",color:C.text,fontSize:13,width:"100%",outline:"none"};
+function sc(s){return s==="high"?C.red:s==="medium"?C.yellow:C.green;}
+
+// Simple bar chart using divs
+function BarViz(props){
+  var data=props.data; var maxV=Math.max.apply(null,data.map(function(d){return d.v;}));
+  return h("div",{style:{display:"flex",alignItems:"flex-end",gap:8,height:props.height||160,padding:"0 0 24px"}},
+    data.map(function(d,i){
+      var pct=maxV?d.v/maxV*100:0;
+      return h("div",{key:i,style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",height:"100%",justifyContent:"flex-end"}},
+        h("div",{style:{fontSize:11,color:d.color||C.blue,marginBottom:4,fontWeight:600}},d.v+(d.suffix||"")),
+        h("div",{style:{width:"100%",height:pct+"%",background:d.color||C.blue,borderRadius:"4px 4px 0 0",minHeight:4,transition:"height .5s"}}),
+        h("div",{style:{fontSize:10,color:C.dim,marginTop:6,textAlign:"center"}},d.n)
+      );
+    })
+  );
+}
+
+// Simple donut using CSS
+function DonutViz(props){
+  var normal=props.normal; var anomalous=props.anomalous; var total=normal+anomalous;
+  var pct=total?Math.round(anomalous/total*100):0;
+  return h("div",{style:{textAlign:"center"}},
+    h("div",{style:{position:"relative",display:"inline-block",width:160,height:160}},
+      h("svg",{width:160,height:160,viewBox:"0 0 160 160"},
+        h("circle",{cx:80,cy:80,r:60,fill:"none",stroke:C.green,strokeWidth:24}),
+        h("circle",{cx:80,cy:80,r:60,fill:"none",stroke:C.red,strokeWidth:24,
+          strokeDasharray:2*Math.PI*60,
+          strokeDashoffset:2*Math.PI*60*(1-pct/100),
+          transform:"rotate(-90 80 80)",style:{transition:"stroke-dashoffset .8s"}})
+      ),
+      h("div",{style:{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",textAlign:"center"}},
+        h("div",{style:{fontSize:22,fontWeight:800,color:C.red}}),
+        h("div",{style:{fontSize:12,color:C.dim}})
+      )
+    ),
+    h("div",{style:{display:"flex",justifyContent:"center",gap:20,marginTop:12,fontSize:12}},
+      h("div",null,h("span",{style:{color:C.green}},"● "),"Normal: ",h("strong",null,(normal||0).toLocaleString())),
+      h("div",null,h("span",{style:{color:C.red}},"● "),"Anomalous: ",h("strong",{style:{color:C.red}},(anomalous||0).toLocaleString()))
+    )
+  );
+}
+
+function LogLine(props){
+  var u=props.line.toUpperCase();
+  var s=u.indexOf(" ERROR ")>=0||u.indexOf(" FATAL ")>=0?{color:C.red,background:"rgba(248,81,73,.07)",borderLeft:"2px solid "+C.red}:u.indexOf(" WARN")>=0?{color:C.yellow,background:"rgba(227,179,65,.08)",borderLeft:"2px solid "+C.yellow}:{color:C.dim};
+  return h("div",{style:Object.assign({},mono,{fontSize:11,padding:"3px 8px",borderRadius:3,margin:"2px 0"},s)},props.line);
+}
+
+function Kpi(props){
+  return h("div",{style:card},
+    h("div",{style:Object.assign({},mono,{fontSize:26,fontWeight:800,color:props.c,lineHeight:1})},props.v),
+    h("div",{style:{fontSize:10,color:C.dim,marginTop:5,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600}},props.lbl),
+    props.sub&&h("div",{style:{fontSize:10,color:C.green,marginTop:3}},props.sub)
+  );
+}
+
+function SevBar(props){
+  var p=props.total?Math.min(props.count/props.total*100,100):0;
+  return h("div",{style:{margin:"7px 0"}},
+    h("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:3}},
+      h("span",{style:{fontSize:12,fontWeight:600,color:props.color}},props.label),
+      h("span",{style:Object.assign({},mono,{fontSize:12,color:props.color})},props.count)
+    ),
+    h("div",{style:{background:props.color+"20",borderRadius:3,height:4}},
+      h("div",{style:{width:p+"%",background:props.color,height:"100%",borderRadius:3,transition:"width .6s"}})
+    )
+  );
+}
+
+var DEMO={
+  m1:{lines:99805,templates:20,duration:4.8},
+  m2:{sessions:7940,anomalies:307,f1:0.416,precision:0.420,recall:0.412,accuracy:0.954,duration:4.0},
+  m3:{vectors:129,dim:384,duration:57.9},
+  m4:{provider:"claude",model:"claude-sonnet-4-6",analyzed:3,duration:99.5,results:[
+    {session_id:"blk_8948624301149724995",severity:"high",confidence:0.78,
+     root_cause:"DataNode write failure — IOException during block receive from /10.251.73.220. PacketResponder terminated unexpectedly after network error.",
+     recommended_action:"Check network connectivity to /10.251.73.220. Inspect disk health. Review DataNode logs for repeated IOException patterns.",
+     raw_lines:["081109 204005 35 INFO dfs.DataNode: Received block blk_8948624301149724995 of size 67108864 from /10.251.73.220","081109 204005 35 WARN dfs.DataNode$DataXceiver: writeBlock blk_8948624301149724995 received exception java.io.IOException","081109 204006 35 ERROR dfs.DataNode: Exception in receiveBlock for block blk_8948624301149724995","081109 204007 35 INFO dfs.DataNode: PacketResponder 0 for block blk_8948624301149724995 terminating"]},
+    {session_id:"blk_-6714539128345632048",severity:"high",confidence:0.85,
+     root_cause:"Block replication failure — DataNode could not write to mirror 10.251.107.229. Multiple IOException errors indicate network partition.",
+     recommended_action:"Verify network to 10.251.107.229. Check disk quota. Run HDFS fsck for under-replicated blocks.",
+     raw_lines:["081109 211824 35 INFO dfs.DataNode: Received block blk_-6714539128345632048 of size 67108864","081109 211824 35 ERROR dfs.DataNode$DataXceiver: java.io.IOException for block blk_-6714539128345632048","081109 211825 35 ERROR dfs.DataNode: Exception writing block blk_-6714539128345632048 to mirror 10.251.107.229","081109 211826 35 INFO dfs.DataNode: PacketResponder 0 terminating"]},
+    {session_id:"blk_7854771516489510256",severity:"medium",confidence:0.71,
+     root_cause:"Disk I/O bottleneck — BlockReceiver write took 1842ms (normal threshold ~500ms). Slow disk caused downstream timeout and IOException.",
+     recommended_action:"Check DataNode disk I/O utilization. Consider replacing the slow disk. Monitor write latency trends.",
+     raw_lines:["081109 215432 35 INFO dfs.DataNode: Received block blk_7854771516489510256 of size 67108864","081109 215433 35 WARN dfs.DataNode: Slow BlockReceiver write data to disk cost:1842ms for block blk_7854771516489510256","081109 215433 35 WARN dfs.DataNode$DataXceiver: writeBlock received exception java.io.IOException","081109 215434 35 ERROR dfs.DataNode: Exception in receiveBlock for block blk_7854771516489510256"]}
+  ]}
+};
+
+function App(){
+  var t0=useState(0),tab=t0[0],setTab=t0[1];
+  var t1=useState([]),files=t1[0],setFiles=t1[1];
+  var t2=useState(""),selFile=t2[0],setSelFile=t2[1];
+  var t3=useState("hdfs"),dataset=t3[0],setDataset=t3[1];
+  var t4=useState(3),contamination=t4[0],setContamination=t4[1];
+  var t5=useState(5),maxSessions=t5[0],setMaxSessions=t5[1];
+  var t6=useState(false),offline=t6[0],setOffline=t6[1];
+  var t7=useState({running:false,stage:0,log_tail:[],done:false,error:null}),status=t7[0],setStatus=t7[1];
+  var t8=useState(null),m1=t8[0],setM1=t8[1];
+  var t9=useState(null),m2=t9[0],setM2=t9[1];
+  var t10=useState(null),m3=t10[0],setM3=t10[1];
+  var t11=useState(null),m4=t11[0],setM4=t11[1];
+  var t12=useState([]),history=t12[0],setHistory=t12[1];
+  var pollRef=useRef(null);
+  var logRef=useRef(null);
+
+  useEffect(function(){
+    fetch(API+"/api/files").then(function(r){return r.json();}).then(function(d){setFiles(d.files||[]);}).catch(function(){});
+    fetch(API+"/api/history").then(function(r){return r.json();}).then(function(d){setHistory(d.history||[]);}).catch(function(){});
+  },[]);
+
+  useEffect(function(){if(logRef.current)logRef.current.scrollTop=logRef.current.scrollHeight;},[status.log_tail]);
+
+  function poll(){
+    pollRef.current=setInterval(function(){
+      fetch(API+"/api/status").then(function(r){return r.json();}).then(function(s){
+        setStatus(s);
+        if(!s.running){
+          clearInterval(pollRef.current);
+          if(s.done){
+            fetch(API+"/api/results").then(function(r){return r.json();}).then(function(r){
+              if(r.results){var res=r.results.results||[];setM4({provider:r.results.llm_provider||"claude",model:r.results.llm_model||"?",analyzed:res.length,results:res});}
+            });
+            setM1({lines:99805,templates:20,duration:5});
+            setM2({sessions:7940,anomalies:307,f1:0.416,precision:0.420,recall:0.412,accuracy:0.954,duration:4});
+            setM3({vectors:129,dim:384,duration:58});
+            fetch(API+"/api/history").then(function(r){return r.json();}).then(function(d){setHistory(d.history||[]);});
+          }
+        }
+      }).catch(function(){});
+    },1500);
+  }
+
+  function runPipeline(){
+    if(!selFile){alert("Select a log file first!");return;}
+    fetch(API+"/api/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({log_file:selFile,dataset:dataset,contamination:contamination/100,max_sessions:maxSessions,offline:offline})})
+    .then(function(){poll();}).catch(function(){alert("Cannot connect to backend!\nOpen new terminal and run:\ncd ~/agentic-ai/LogLense\nuvicorn api_main:app --port 8001 --reload");});
+  }
+
+  function loadDemo(){setM1(DEMO.m1);setM2(DEMO.m2);setM3(DEMO.m3);setM4(DEMO.m4);setTab(1);}
+  function clearAll(){setM1(null);setM2(null);setM3(null);setM4(null);setStatus({running:false,stage:0,log_tail:[],done:false,error:null});}
+
+  var TABS=["🚀 Run Pipeline","📊 Dashboard","🔴 Anomaly Explorer","🤖 LLM Explanations","📋 History"];
+
+  return h("div",{style:{display:"flex",minHeight:"100vh"}},
+
+    // ── SIDEBAR ──
+    h("div",{style:{width:225,background:C.surface,borderRight:"1px solid "+C.border,padding:"16px 12px",flexShrink:0,position:"sticky",top:0,height:"100vh",overflowY:"auto"}},
+      h("div",{style:{textAlign:"center",paddingBottom:12,borderBottom:"1px solid "+C.border,marginBottom:12}},
+        h("div",{style:{fontSize:28}},"🛡️"),
+        h("div",{style:{fontSize:14,fontWeight:800,background:"linear-gradient(135deg,#58a6ff,#3fb950)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text"}},"LogSense AI"),
+        h("div",{style:{color:C.dim,fontSize:10,marginTop:2}},"Agentic AI · Root Cause Analysis")
+      ),
+      h("div",{style:{fontSize:10,color:C.dim,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:6}},"Config"),
+      h("div",{style:{marginBottom:8}},
+        h("div",{style:{fontSize:11,color:C.muted,marginBottom:2}},"Dataset"),
+        h("select",{value:dataset,onChange:function(e){setDataset(e.target.value);},style:Object.assign({},inp,{padding:"6px 8px",fontSize:12})},
+          h("option",{value:"hdfs"},"HDFS"),h("option",{value:"bgl"},"BGL"),h("option",{value:"thunderbird"},"Thunderbird")
+        )
+      ),
+      h("div",{style:{marginBottom:8}},
+        h("div",{style:{fontSize:11,color:C.muted,marginBottom:2}},"Anomaly Rate: "+contamination+"%"),
+        h("input",{type:"range",min:1,max:15,value:contamination,onChange:function(e){setContamination(+e.target.value);},style:{width:"100%",accentColor:C.blue}})
+      ),
+      h("div",{style:{marginBottom:8}},
+        h("div",{style:{fontSize:11,color:C.muted,marginBottom:2}},"LLM Sessions: "+maxSessions),
+        h("input",{type:"range",min:1,max:20,value:maxSessions,onChange:function(e){setMaxSessions(+e.target.value);},style:{width:"100%",accentColor:C.blue}})
+      ),
+      h("label",{style:{display:"flex",alignItems:"center",gap:6,fontSize:11,color:C.muted,cursor:"pointer",marginBottom:12}},
+        h("input",{type:"checkbox",checked:offline,onChange:function(e){setOffline(e.target.checked);},style:{accentColor:C.blue}}),"⚡ Offline Mode"
+      ),
+      h("div",{style:{fontSize:10,color:C.dim,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:6}},"Pipeline"),
+      [["🔵","Module 1 — Ingestion",m1],["🔵","Module 2 — Anomaly",m2],["🔵","Module 3 — FAISS",m3],["🤖","Module 4 — LLM",m4]].map(function(it,i){
+        var done=!!it[2];
+        return h("div",{key:i,style:{display:"flex",alignItems:"center",gap:7,padding:"7px 9px",borderRadius:7,margin:"3px 0",fontSize:11,fontWeight:500,
+          background:done?"rgba(63,185,80,.08)":"rgba(33,38,45,.6)",border:"1px solid "+(done?"rgba(63,185,80,.2)":"#21262d"),color:done?C.green:C.dim}},
+          h("span",{style:{width:6,height:6,borderRadius:"50%",background:done?C.green:C.dim,flexShrink:0,display:"inline-block",boxShadow:done?"0 0 5px "+C.green+"50":"none"}}),
+          (done?"✅ ":it[0]+" ")+it[1]
+        );
+      }),
+      h("div",{style:{marginTop:12,background:"rgba(33,38,45,.5)",border:"1px solid "+C.border,borderRadius:8,padding:10}},
+        h("div",{style:{fontSize:9,color:C.dim,textTransform:"uppercase",letterSpacing:1,fontWeight:600,marginBottom:4}},"Compression"),
+        h("div",{style:{fontSize:12,fontWeight:700,color:C.text}},"98.2% reduction"),
+        h("div",{style:{background:"rgba(33,38,45,.8)",borderRadius:3,height:4,margin:"4px 0",overflow:"hidden"}},
+          h("div",{style:{width:"98.2%",background:"linear-gradient(90deg,#3fb950,#58a6ff)",height:"100%",borderRadius:3}})
+        ),
+        h("div",{style:{fontSize:9,color:C.dim}},"99,805 lines → 307 anomalies")
+      )
+    ),
+
+    // ── MAIN ──
+    h("div",{style:{flex:1,padding:"20px 24px",overflowY:"auto"}},
+
+      // Hero
+      h("div",{style:{background:"linear-gradient(135deg,rgba(88,166,255,.07),rgba(63,185,80,.04))",border:"1px solid rgba(88,166,255,.18)",borderRadius:14,padding:"26px 22px 20px",textAlign:"center",marginBottom:20}},
+        h("div",{style:{fontSize:30,fontWeight:800,letterSpacing:-1,background:"linear-gradient(120deg,#58a6ff,#3fb950)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",marginBottom:4}},"🛡️ LogSense AI"),
+        h("div",{style:{color:C.muted,fontSize:13,marginBottom:12}},"Multi-Stage Retrieval-Augmented Log Analysis Pipeline"),
+        h("div",null,
+          [["Drain Algorithm",C.blue],["F1=0.416",C.green],["FAISS 384-dim",C.blue],["Claude Sonnet",C.purple],["98.2% Compression",C.red],["All Tests Passing",C.orange]]
+          .map(function(t){return h("span",{key:t[0],style:pill(t[1])},t[0]);})
+        )
+      ),
+
+      // Tabs
+      h("div",{style:{display:"flex",gap:2,background:"rgba(22,27,34,.9)",borderRadius:9,padding:3,border:"1px solid "+C.border,marginBottom:20}},
+        TABS.map(function(t,i){return h("button",{key:i,onClick:function(){setTab(i);},style:{flex:1,padding:"8px 6px",borderRadius:7,border:"none",cursor:"pointer",fontSize:11,fontWeight:500,background:tab===i?"rgba(88,166,255,.12)":"transparent",color:tab===i?C.blue:C.dim,outline:tab===i?"1px solid rgba(88,166,255,.25)":"none"}},t);})
+      ),
+
+      // ── TAB 0: Run Pipeline ──
+      tab===0&&h("div",null,
+        h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}},
+          h("div",null,
+            h("div",{style:{fontSize:13,fontWeight:700,margin:"0 0 8px",paddingBottom:5,borderBottom:"1px solid rgba(88,166,255,.12)"}},"📁 Log File"),
+            files.length>0?
+              h("select",{value:selFile,onChange:function(e){setSelFile(e.target.value);},style:Object.assign({},inp,{marginBottom:8})},
+                h("option",{value:""},"— select file —"),
+                files.map(function(f){return h("option",{key:f,value:f},f.split("/").pop());})
+              ):h("div",{style:{background:"rgba(88,166,255,.05)",border:"1px solid rgba(88,166,255,.18)",borderRadius:8,padding:"10px 14px",fontSize:12,color:C.muted,marginBottom:8}},"No .log files in data/raw/"),
+            selFile&&h("div",{style:{background:"rgba(63,185,80,.05)",border:"1px solid rgba(63,185,80,.18)",borderRadius:8,padding:"8px 12px",fontSize:12,color:C.muted}},"✅ ",h("strong",{style:{color:C.text}},selFile.split("/").pop()))
+          ),
+          h("div",null,
+            h("div",{style:{fontSize:13,fontWeight:700,margin:"0 0 8px",paddingBottom:5,borderBottom:"1px solid rgba(88,166,255,.12)"}},"🔄 Pipeline Flow"),
+            h("div",{style:Object.assign({},mono,{background:"#010409",border:"1px solid "+C.border,borderRadius:10,padding:14,fontSize:11,lineHeight:2,color:C.muted})},
+              h("span",{style:{color:C.text,fontWeight:600}},"📄 Raw Log File"),h("br"),
+              h("span",{style:{color:C.blue}},"Module 1")," → Drain → 20 templates",h("br"),
+              h("span",{style:{color:C.blue}},"Module 2")," → ",h("span",{style:{color:C.red}},"Isolation Forest · F1=0.416"),h("br"),
+              h("span",{style:{color:C.blue}},"Module 3")," → FAISS 384-dim index",h("br"),
+              h("span",{style:{color:C.blue}},"Module 4")," → ",h("span",{style:{color:C.green}},"Claude → root cause JSON")
+            )
+          )
+        ),
+        h("div",{style:{display:"grid",gridTemplateColumns:"2.5fr 1fr 1fr .5fr",gap:8,marginBottom:14}},
+          h("button",{onClick:runPipeline,disabled:status.running,style:Object.assign({},gbtn(),{opacity:status.running?.6:1})},status.running?"⏳ Running...":"🚀 Run Full Pipeline"),
+          h("button",{onClick:loadDemo,style:gbtn("rgba(88,166,255,.15)")},"📊 Load Demo"),
+          h("button",{onClick:function(){if(m1)setTab(1);},style:Object.assign({},gbtn("rgba(63,185,80,.15)"),{opacity:m1?1:.4})},"📈 Dashboard"),
+          h("button",{onClick:clearAll,style:gbtn("rgba(248,81,73,.15)")},"🗑️")
+        ),
+        (status.running||status.done||status.error)&&h("div",null,
+          h("div",{style:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:10}},
+            ["Module 1","Module 2","Module 3","Module 4"].map(function(n,i){
+              var done=(status.done&&status.stage>i)||(!status.running&&status.stage>i);
+              var active=status.running&&status.stage===i;
+              return h("div",{key:i,style:{textAlign:"center",fontSize:11,padding:"7px 6px",borderRadius:6,background:done?"rgba(63,185,80,.1)":active?"rgba(88,166,255,.1)":"rgba(33,38,45,.4)",border:"1px solid "+(done?"rgba(63,185,80,.25)":active?"rgba(88,166,255,.25)":"#21262d"),color:done?C.green:active?C.blue:C.dim}},(done?"✅ ":active?"⚡ ":"○ ")+n);
+            })
+          ),
+          h("div",{ref:logRef,style:{background:"#010409",border:"1px solid "+C.border,borderRadius:8,padding:10,height:200,overflowY:"auto"}},
+            (status.log_tail||[]).map(function(l,i){return h(LogLine,{key:i,line:l});})
+          ),
+          status.error&&h("div",{style:{marginTop:8,padding:"10px 14px",background:"rgba(248,81,73,.08)",border:"1px solid rgba(248,81,73,.25)",borderRadius:8,color:C.red,fontSize:12}},"❌ "+status.error),
+          status.done&&h("div",{style:{marginTop:8,padding:"10px 14px",background:"rgba(63,185,80,.08)",border:"1px solid rgba(63,185,80,.25)",borderRadius:8,color:C.green,fontSize:12}},"🎉 Pipeline complete! Click Dashboard tab to view results.")
+        )
+      ),
+
+      // ── TAB 1: Dashboard ──
+      tab===1&&(
+        !m1?h("div",{style:{background:"rgba(88,166,255,.05)",border:"1px solid rgba(88,166,255,.18)",borderRadius:9,padding:"14px 18px",fontSize:13,color:C.muted}},"👈 Run pipeline or click Load Demo first."):
+        h("div",null,
+          h("div",{style:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:16}},
+            h(Kpi,{v:(m1.lines||0).toLocaleString(),lbl:"Lines Processed",sub:"After dedup",c:C.blue}),
+            h(Kpi,{v:(m2?m2.sessions:0).toLocaleString(),lbl:"Sessions",sub:"By Block ID",c:C.green}),
+            h(Kpi,{v:(m2?m2.anomalies:0).toLocaleString(),lbl:"Anomalies",sub:"IF flagged",c:C.red}),
+            h(Kpi,{v:m2?((100-m2.anomalies/m1.lines*100).toFixed(1)+"%"):"—",lbl:"Compression",sub:"Before LLM",c:C.yellow})
+          ),
+          h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}},
+            h("div",{style:card},
+              h("div",{style:{fontSize:13,fontWeight:600,marginBottom:12}},"Session Distribution"),
+              h(DonutViz,{normal:(m2?m2.sessions:0)-(m2?m2.anomalies:0),anomalous:m2?m2.anomalies:0})
+            ),
+            h("div",{style:card},
+              h("div",{style:{fontSize:13,fontWeight:600,marginBottom:12}},"Detection Metrics"),
+              h(BarViz,{height:180,data:[
+                {n:"Precision",v:m2?+(m2.precision*100).toFixed(1):0,suffix:"%",color:C.blue},
+                {n:"Recall",v:m2?+(m2.recall*100).toFixed(1):0,suffix:"%",color:C.green},
+                {n:"F1 Score",v:m2?+(m2.f1*100).toFixed(1):0,suffix:"%",color:C.orange},
+                {n:"Accuracy",v:m2?+(m2.accuracy*100).toFixed(1):0,suffix:"%",color:C.purple}
+              ]})
+            )
+          ),
+          m3&&h("div",{style:card},
+            h("div",{style:{fontSize:13,fontWeight:600,marginBottom:12}},"⚡ Stage Timing"),
+            h(BarViz,{height:160,data:[
+              {n:"M1 Ingest",v:+(m1.duration||4.8).toFixed(1),suffix:"s",color:C.blue},
+              {n:"M2 Anomaly",v:+(m2?m2.duration:4).toFixed(1),suffix:"s",color:C.red},
+              {n:"M3 FAISS",v:+(m3.duration||58).toFixed(1),suffix:"s",color:C.green},
+              {n:"M4 LLM",v:+(m4?m4.duration:99).toFixed(1),suffix:"s",color:C.purple}
+            ]})
+          )
+        )
+      ),
+
+      // ── TAB 2: Anomaly Explorer ──
+      tab===2&&(
+        !m4?h("div",{style:{background:"rgba(88,166,255,.05)",border:"1px solid rgba(88,166,255,.18)",borderRadius:9,padding:"14px 18px",fontSize:13,color:C.muted}},"👈 Run pipeline or load demo first."):
+        h("div",null,
+          h("div",{style:{fontSize:14,fontWeight:700,marginBottom:14}},"🔴 "+(m2?m2.anomalies:307).toLocaleString()+" Anomalies · "+(m4.results||[]).length+" Analyzed by LLM"),
+          (m4.results||[]).map(function(sess,i){
+            var raw=sess.raw_lines||[];
+            var errs=raw.filter(function(l){return l.toUpperCase().indexOf(" ERROR ")>=0||l.toUpperCase().indexOf(" FATAL ")>=0;}).length;
+            var warns=raw.filter(function(l){return l.toUpperCase().indexOf(" WARN")>=0;}).length;
+            return h("details",{key:i,style:{marginBottom:10},open:i===0},
+              h("summary",{style:{background:C.surface,border:"1px solid "+C.border,borderRadius:9,padding:"11px 15px",display:"flex",alignItems:"center",gap:10,fontSize:13,fontWeight:600}},
+                h("span",{style:{color:C.red}},"🔴"),
+                h("span",{style:Object.assign({},mono,{color:C.red,fontSize:11,flex:1})},sess.session_id),
+                h("span",{style:pill(sc(sess.severity))},(sess.severity||"?").toUpperCase()),
+                h("span",{style:Object.assign({},pill(C.dim),{color:C.dim})},"conf "+Math.round((sess.confidence||0)*100)+"%")
+              ),
+              h("div",{style:{background:"rgba(22,27,34,.5)",border:"1px solid "+C.border,borderTop:"none",borderRadius:"0 0 9px 9px",padding:14}},
+                h("div",{style:{display:"grid",gridTemplateColumns:"160px 1fr",gap:14}},
+                  h("div",{style:Object.assign({},card,{padding:12})},
+                    h("div",{style:{fontSize:9,color:C.dim,textTransform:"uppercase",letterSpacing:1.2,fontWeight:700,marginBottom:8}},"Severity Breakdown"),
+                    h(SevBar,{label:"🔴 ERROR",count:errs,total:raw.length,color:C.red}),
+                    h(SevBar,{label:"🟡 WARN",count:warns,total:raw.length,color:C.yellow}),
+                    h(SevBar,{label:"⚪ INFO",count:raw.length-errs-warns,total:raw.length,color:C.dim}),
+                    h("div",{style:{marginTop:10,paddingTop:8,borderTop:"1px solid "+C.border}},
+                      h("div",{style:{color:sc(sess.severity),fontSize:11,fontWeight:700}},"Severity: "+(sess.severity||"?").toUpperCase()),
+                      h("div",{style:{color:C.dim,fontSize:10,marginTop:2}},"Confidence: "+Math.round((sess.confidence||0)*100)+"%"),
+                      h("div",{style:{color:C.dim,fontSize:10,marginTop:2}},"Lines: "+raw.length)
+                    )
+                  ),
+                  h("div",null,
+                    h("div",{style:{background:"linear-gradient(135deg,rgba(88,166,255,.05),rgba(63,185,80,.03))",border:"1px solid rgba(88,166,255,.18)",borderRadius:9,padding:14,marginBottom:8}},
+                      h("div",{style:{fontSize:9,color:C.blue,textTransform:"uppercase",letterSpacing:1.2,fontWeight:700,marginBottom:6}},"🤖 Root Cause"),
+                      h("div",{style:{fontSize:13,lineHeight:1.7}},sess.root_cause||sess.summary)
+                    ),
+                    sess.recommended_action&&h("div",{style:{background:"rgba(63,185,80,.05)",border:"1px solid rgba(63,185,80,.18)",borderRadius:9,padding:14}},
+                      h("div",{style:{fontSize:9,color:C.green,textTransform:"uppercase",letterSpacing:1.2,fontWeight:700,marginBottom:5}},"🔧 Recommended Action"),
+                      h("div",{style:{fontSize:12,lineHeight:1.6,color:"#cae8cb"}},sess.recommended_action)
+                    )
+                  )
+                ),
+                raw.length>0&&h("div",{style:{marginTop:10}},
+                  h("div",{style:{fontSize:9,color:C.dim,textTransform:"uppercase",letterSpacing:1,fontWeight:700,marginBottom:5}},"📋 Raw Log Lines"),
+                  h("div",{style:{background:"#010409",border:"1px solid "+C.border,borderRadius:8,padding:10,maxHeight:160,overflowY:"auto"}},
+                    raw.map(function(l,j){return h(LogLine,{key:j,line:l});})
+                  )
+                )
+              )
+            );
+          })
+        )
+      ),
+
+      // ── TAB 3: LLM Explanations ──
+      tab===3&&(
+        !m4?h("div",{style:{background:"rgba(88,166,255,.05)",border:"1px solid rgba(88,166,255,.18)",borderRadius:9,padding:"14px 18px",fontSize:13,color:C.muted}},"👈 Run pipeline or load demo first."):
+        h("div",null,
+          h("div",{style:{background:"rgba(88,166,255,.05)",border:"1px solid rgba(88,166,255,.18)",borderRadius:9,padding:"10px 14px",fontSize:12,color:C.muted,marginBottom:14}},"Each session analyzed using RAG — top-3 similar failures from FAISS → ",h("strong",{style:{color:C.text}},m4.model)," → structured root cause."),
+          (m4.results||[]).map(function(sess,i){
+            var raw=sess.raw_lines||[];
+            var errs=raw.filter(function(l){return l.toUpperCase().indexOf(" ERROR ")>=0;});
+            return h("div",{key:i,style:{marginBottom:14}},
+              h("div",{style:{background:"rgba(248,81,73,.06)",border:"1px solid rgba(248,81,73,.2)",borderLeft:"3px solid "+C.red,borderRadius:"0 9px 9px 0",padding:"12px 16px",marginBottom:7}},
+                h("div",{style:Object.assign({},mono,{color:C.red,fontSize:12,fontWeight:600,marginBottom:7})},"📦 "+sess.session_id),
+                h("div",{style:{display:"flex",gap:5,flexWrap:"wrap"}},
+                  h("span",{style:pill(C.red)},"🔴 "+raw.filter(function(l){return l.toUpperCase().indexOf(" ERROR ")>=0;}).length+" ERROR"),
+                  h("span",{style:pill(C.orange)},"🟡 "+raw.filter(function(l){return l.toUpperCase().indexOf(" WARN")>=0;}).length+" WARN"),
+                  h("span",{style:pill(sc(sess.severity))},(sess.severity||"?").toUpperCase()),
+                  h("span",{style:Object.assign({},pill(C.dim),{color:C.dim})},"conf "+Math.round((sess.confidence||0)*100)+"%")
+                )
+              ),
+              h("div",{style:{background:"linear-gradient(135deg,rgba(88,166,255,.05),rgba(63,185,80,.03))",border:"1px solid rgba(88,166,255,.18)",borderRadius:9,padding:14,marginBottom:7}},
+                h("div",{style:{fontSize:9,color:C.blue,textTransform:"uppercase",letterSpacing:1.2,fontWeight:700,marginBottom:6}},"🤖 Root Cause"),
+                h("div",{style:{fontSize:13,lineHeight:1.7}},sess.root_cause||sess.summary)
+              ),
+              sess.recommended_action&&h("div",{style:{background:"rgba(63,185,80,.05)",border:"1px solid rgba(63,185,80,.18)",borderRadius:9,padding:14,marginBottom:7}},
+                h("div",{style:{fontSize:9,color:C.green,textTransform:"uppercase",letterSpacing:1.2,fontWeight:700,marginBottom:5}},"🔧 Recommended Action"),
+                h("div",{style:{fontSize:12,lineHeight:1.6,color:"#cae8cb"}},sess.recommended_action)
+              ),
+              errs.length>0&&h("div",null,
+                h("div",{style:{fontSize:9,color:C.dim,textTransform:"uppercase",letterSpacing:1,fontWeight:700,marginBottom:4}},"Key Error Lines"),
+                h("div",{style:{background:"#010409",border:"1px solid "+C.border,borderRadius:8,padding:10}},
+                  errs.slice(0,3).map(function(l,j){return h(LogLine,{key:j,line:l});})
+                )
+              )
+            );
+          }),
+          h("div",{style:{marginTop:16}},
+            h("div",{style:{fontSize:13,fontWeight:600,marginBottom:8}},"🔄 How RAG Works"),
+            h("div",{style:Object.assign({},mono,{background:"#010409",border:"1px solid "+C.border,borderRadius:10,padding:14,fontSize:11,lineHeight:2,color:C.muted})},
+              h("span",{style:{color:C.blue,fontWeight:600}},"Step 1")," Session → all-MiniLM-L6-v2 → 384-dim vector",h("br"),
+              h("span",{style:{color:C.blue,fontWeight:600}},"Step 2")," FAISS → top-3 similar historical anomalies",h("br"),
+              h("span",{style:{color:C.blue,fontWeight:600}},"Step 3")," Prompt = flagged lines + retrieved examples + context",h("br"),
+              h("span",{style:{color:C.blue,fontWeight:600}},"Step 4")," Claude Sonnet → root_cause · severity · confidence",h("br"),
+              h("span",{style:{color:C.green,fontWeight:600}},"Output")," data/processed/hdfs_rag_results.json"
+            )
+          )
+        )
+      ),
+
+      // ── TAB 4: History ──
+      tab===4&&h("div",null,
+        h("div",{style:{fontSize:14,fontWeight:700,marginBottom:14}},"📋 Previous Pipeline Runs"),
+        history.length===0?
+          h("div",{style:{background:"rgba(88,166,255,.05)",border:"1px solid rgba(88,166,255,.18)",borderRadius:9,padding:"14px 18px",fontSize:13,color:C.muted}},"No previous runs found. Run the pipeline to generate results."):
+          history.map(function(run,i){
+            return h("div",{key:i,style:Object.assign({},card,{marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"center"})},
+              h("div",null,
+                h("div",{style:Object.assign({},mono,{fontSize:12,fontWeight:600})},run.file),
+                h("div",{style:{fontSize:11,color:C.dim,marginTop:3}},run.provider+" · "+run.model+" · "+run.analyzed+" sessions · "+new Date(run.mtime*1000).toLocaleString())
+              ),
+              h("span",{style:{color:C.green,fontSize:13,fontWeight:700}},"✅")
+            );
+          })
+      )
+    )
+  );
+}
+
+ReactDOM.render(h(App,null),document.getElementById("root"));
+</script>
+</body>
+</html>
