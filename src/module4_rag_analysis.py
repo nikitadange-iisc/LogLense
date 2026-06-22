@@ -210,6 +210,7 @@ def run_module4(
     elapsed = round(time.time() - t0, 2)
 
     # ── Step 5: Write output JSON ──────────────────────────────────────────
+    batch_tokens = getattr(rag, "last_batch_tokens", {})
     output_payload = {
         "dataset":          dataset,
         "llm_provider":     rag.provider,
@@ -220,6 +221,7 @@ def run_module4(
         "sessions_analysed": len(results),
         "processing_time_sec": elapsed,
         "offline_mode":     offline or rag.provider == "offline",
+        "token_usage_total": batch_tokens,
         "results":          results,
     }
 
@@ -239,6 +241,13 @@ def run_module4(
     print(f"Top-K retrieval  : {top_k}")
     print(f"Sessions analysed: {len(results):>6,}")
     print(f"Processing time  : {elapsed:>6.1f}s")
+    if batch_tokens:
+        avg_in  = batch_tokens["input"]  // max(len(results), 1)
+        avg_out = batch_tokens["output"] // max(len(results), 1)
+        print(f"Tokens  (total)  : {batch_tokens['total']:>8,}  "
+              f"(in={batch_tokens['input']:,}  out={batch_tokens['output']:,})")
+        print(f"Tokens  (per session): in~{avg_in:,}  out~{avg_out:,}  "
+              f"total~{avg_in+avg_out:,}")
     print(f"\nOutput: {output_json}")
 
     if not (offline or rag.provider == "offline"):

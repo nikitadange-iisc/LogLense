@@ -31,7 +31,7 @@ Your task:
 3. Identify the specific root cause of the failure.
 4. Provide a line-level failure trace showing how the issue progressed.
 
-Respond ONLY with valid JSON in this exact format:
+Respond ONLY with valid JSON in this exact format — no text before or after the JSON:
 {
     "root_cause": "Brief one-sentence description of the root cause",
     "affected_line_range": [start_line, end_line],
@@ -42,7 +42,14 @@ Respond ONLY with valid JSON in this exact format:
     ],
     "severity": "critical|high|medium|low",
     "recommended_action": "Concrete steps to resolve or investigate further"
-}"""
+}
+
+CRITICAL JSON rules — violations make the output unusable:
+- All string values must have internal double-quotes escaped as \"
+- All backslashes must be escaped as \\
+- No raw newlines inside string values — use \\n if needed
+- Keep each failure_trace line value short (under 120 chars); truncate with ... if needed
+- Output raw JSON only — do NOT wrap in markdown code fences"""
 
 _SYSTEM_HDFS = _SYSTEM_BASE + """
 
@@ -233,8 +240,14 @@ Identify the root cause and respond with the required JSON structure.
 
     # ── LLM call ──────────────────────────────────────────────────────────
 
-    def _call_llm(self, prompt: str) -> str:
-        """Call the configured LLM and return the raw response text."""
+    def _call_llm(self, prompt: str) -> tuple:
+        """
+        Call the configured LLM.
+
+        Returns:
+            (response_text, usage_dict) where usage_dict has keys
+            input_tokens and output_tokens.
+        """
         if self.provider == "offline" or self._client is None:
             raise RuntimeError(
                 "No LLM client available. Set ANTHROPIC_API_KEY or OPENAI_API_KEY, "
@@ -251,7 +264,11 @@ Identify the root cause and respond with the required JSON structure.
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.2,
             )
-            return response.content[0].text
+            usage = {
+                "input_tokens":  response.usage.input_tokens,
+                "output_tokens": response.usage.output_tokens,
+            }
+            return response.content[0].text, usage
 
         else:  # openai
             response = self._client.chat.completions.create(
@@ -264,23 +281,93 @@ Identify the root cause and respond with the required JSON structure.
                 ],
                 response_format={"type": "json_object"},
             )
-            return response.choices[0].message.content
+            usage = {
+                "input_tokens":  response.usage.prompt_tokens,
+                "output_tokens": response.usage.completion_tokens,
+            }
+            return response.choices[0].message.content, usage
 
     # ── Analysis methods ───────────────────────────────────────────────────
 
     @staticmethod
     def _parse_llm_json(response_text: str) -> dict:
-        """Parse JSON returned directly or inside a markdown code fence."""
+        """Parse JSON from a response that may contain markdown fences or preamble text."""
+        import re
         text = response_text.strip()
-        if text.startswith("```"):
-            lines = text.splitlines()
-            if lines and lines[0].startswith("```"):
-                lines = lines[1:]
-            if lines and lines[-1].startswith("```"):
-                lines = lines[:-1]
-            text = "\n".join(lines).strip()
 
-        return json.loads(text)
+        # Strip opening ```json or ``` fence anchored at the start of the text
+        open_fence = re.match(r"```(?:json)?\s*\n?", text)
+        if open_fence:
+            text = text[open_fence.end():]
+            # Strip the matching closing fence at the end
+            close_fence = re.search(r"\n?```\s*$", text)
+            if close_fence:
+                text = text[:close_fence.start()]
+            text = text.strip()
+
+        # 1. Try direct parse (works when response is clean JSON or fence was stripped)
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            pass
+
+        # 2. Slice from first '{' to last '}' — handles stray preamble/postamble
+        start = text.find("{")
+        end   = text.rfind("}")
+        if start != -1 and end > start:
+            try:
+                return json.loads(text[start : end + 1])
+            except json.JSONDecodeError:
+                pass
+
+        # 3. Regex field extraction — recovers key fields when failure_trace contains
+        #    unescaped quotes or other characters that break JSON syntax
+        extracted = RAGPipeline._extract_fields_regex(text)
+        if extracted:
+            return extracted
+
+        raise json.JSONDecodeError("No valid JSON found in LLM response", text, 0)
+
+    @staticmethod
+    def _extract_fields_regex(text: str) -> dict:
+        """
+        Last-resort field extractor using regex when json.loads fails entirely.
+        Pulls scalar fields reliably; skips failure_trace (too fragile to regex-parse).
+        Returns None if the minimum required fields are not found.
+        """
+        import re
+
+        def _str_field(name: str) -> str:
+            m = re.search(rf'"{name}"\s*:\s*"((?:[^"\\]|\\.)*)"', text)
+            return m.group(1) if m else None
+
+        def _num_field(name: str):
+            m = re.search(rf'"{name}"\s*:\s*([0-9.]+)', text)
+            return float(m.group(1)) if m else None
+
+        def _arr_field(name: str):
+            m = re.search(rf'"{name}"\s*:\s*\[([^\]]*)\]', text)
+            if not m:
+                return None
+            try:
+                return json.loads("[" + m.group(1) + "]")
+            except json.JSONDecodeError:
+                return None
+
+        root_cause = _str_field("root_cause")
+        if not root_cause:
+            return None
+
+        return {
+            "root_cause":          root_cause,
+            "severity":            _str_field("severity") or "unknown",
+            "confidence":          _num_field("confidence") or 0.5,
+            "explanation":         _str_field("explanation") or "",
+            "recommended_action":  _str_field("recommended_action") or "",
+            "affected_line_range": _arr_field("affected_line_range"),
+            "failure_trace":       [],
+            "_parse_note":         "regex-extracted: failure_trace skipped (malformed JSON)",
+        }
 
     def analyze(self, session, top_k: int = 3) -> dict:
         """
@@ -294,16 +381,13 @@ Identify the root cause and respond with the required JSON structure.
         prompt       = self.build_prompt(session, retrieved)
         logger.info("Calling %s (%s) for session %s ...",
                     self.provider, self.model, session.session_id)
-        raw_response = self._call_llm(prompt)
+        raw_response, usage = self._call_llm(prompt)
+        logger.info("Tokens — input: %d  output: %d  total: %d",
+                    usage["input_tokens"], usage["output_tokens"],
+                    usage["input_tokens"] + usage["output_tokens"])
 
         try:
-            # Claude may wrap JSON in markdown fences — strip them
-            text = raw_response.strip()
-            if text.startswith("```"):
-                text = text.split("```")[1]
-                if text.startswith("json"):
-                    text = text[4:]
-            result = json.loads(text.strip())
+            result = self._parse_llm_json(raw_response)
         except json.JSONDecodeError:
             logger.warning("LLM response was not valid JSON — storing as plain text")
             result = {
@@ -315,30 +399,38 @@ Identify the root cause and respond with the required JSON structure.
                 "recommended_action": "Review raw LLM response.",
             }
 
-        result["session_id"]              = session.session_id
-        result["line_range"]              = getattr(session, "line_range", None)
-        result["anomaly_score"]           = getattr(session, "anomaly_score", None)
+        result["session_id"]               = session.session_id
+        result["line_range"]               = getattr(session, "line_range", None)
+        result["anomaly_score"]            = getattr(session, "anomaly_score", None)
         result["retrieved_examples_count"] = len(retrieved)
-        result["llm_provider"]            = self.provider
-        result["llm_model"]               = self.model
+        result["llm_provider"]             = self.provider
+        result["llm_model"]                = self.model
+        result["token_usage"]              = usage
         return result
 
     def analyze_batch(self, sessions: list, top_k: int = 3) -> list:
         """Analyse multiple sessions, isolating errors per session."""
         results = []
+        total_in = total_out = 0
         for i, session in enumerate(sessions, 1):
             logger.info("Analysing session %d/%d: %s", i, len(sessions), session.session_id)
             try:
-                results.append(self.analyze(session, top_k=top_k))
+                r = self.analyze(session, top_k=top_k)
+                u = r.get("token_usage", {})
+                total_in  += u.get("input_tokens", 0)
+                total_out += u.get("output_tokens", 0)
+                results.append(r)
             except Exception as e:
                 logger.error("Failed to analyse %s: %s", session.session_id, e)
                 results.append({
-                    "session_id":  session.session_id,
-                    "error":       str(e),
+                    "session_id":   session.session_id,
+                    "error":        str(e),
                     "llm_provider": self.provider,
-                    "llm_model":   self.model,
+                    "llm_model":    self.model,
                 })
-        logger.info("Batch analysis complete — %d sessions", len(results))
+        logger.info("Batch complete — %d sessions | tokens in=%d out=%d total=%d",
+                    len(results), total_in, total_out, total_in + total_out)
+        self.last_batch_tokens = {"input": total_in, "output": total_out, "total": total_in + total_out}
         return results
 
     def analyze_offline(self, session, top_k: int = 3) -> dict:
