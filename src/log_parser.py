@@ -47,7 +47,7 @@ HEADER_PATTERNS = {
         r"(?P<date>\d{4}\.\d{2}\.\d{2})\s+"
         r"(?P<node>\S+)\s+"
         r"(?P<time>\S+)\s+"
-        r"(?P<nodenum>\d+)\s+"
+        r"(?P<noderepeat>\S+)\s+"   # reporting node — same ID as node, not a number
         r"(?P<type>\S+)\s+"
         r"(?P<component>\S+)\s+"
         r"(?P<level>\S+)\s+"
@@ -242,15 +242,10 @@ class LogParser:
             "extracted_variables": variables,
             "raw_line": line,
             "line_number": line_number,
-            "level": level,
             "severity_score": SEVERITY_MAP.get(level, -1),
-            "component": header.get("component", ""),
-            # Header fields passed through so the Module 1 CSV writer (and
-            # anyone else) doesn't have to parse the header a second time.
-            "date": header.get("date", ""),
-            "time": header.get("time", ""),
-            "pid": header.get("pid", ""),
-            "content": content,
+            **header,        # all dataset-specific fields (date, time, pid, node, adminaddr, …)
+            "level": level,  # ensure always set even when header fallback fires
+            "content": content,  # override with extracted free-text, not the full raw line
         }
 
     # ── Variable extraction ────────────────────────────────────────────
@@ -272,7 +267,7 @@ class LogParser:
 
             if len(content_tokens) == len(template_tokens):
                 for ct, tt in zip(content_tokens, template_tokens):
-                    if tt == "<*>":
+                    if re.search(r"<[^>]+>", tt):
                         variables.append(ct)
             else:
                 variables = self._regex_extract(content)
