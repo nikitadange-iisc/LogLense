@@ -11,7 +11,7 @@ Raw Log File
     ↓ Stage 3: Session grouping (Block ID / sliding window) → count vectors
     ↓ Stage 4: Isolation Forest → anomaly scoring & gating
     ↓ Stage 5: Sentence-transformer embedding → FAISS indexing
-    ↓ Stage 6: RAG prompt assembly → GPT-4o-mini root cause analysis
+    ↓ Stage 6: RAG prompt assembly → Anthropic root cause analysis
 ```
 
 ## Quick Start
@@ -26,7 +26,7 @@ pip install -r requirements.txt
 
 ```bash
 cp .env.example .env
-# Edit .env with your OpenAI API key
+# Edit .env with your Anthropic API key
 ```
 
 ### 3. Run with Sample Data
@@ -37,8 +37,11 @@ cd src
 # Full pipeline (offline mode — no LLM API calls)
 python pipeline.py ../data/raw/sample_hdfs.log -l ../data/raw/sample_labels.csv -d hdfs --offline
 
-# Full pipeline with LLM analysis
+# Full pipeline with Anthropic analysis
 python pipeline.py ../data/raw/sample_hdfs.log -l ../data/raw/sample_labels.csv -d hdfs
+
+# Module 4 inference entry point
+python inference_pipeline.py ../data/raw/sample_hdfs.log -l ../data/raw/sample_labels.csv -d hdfs --max-analyze 5
 
 # Run individual stages
 python ingestion.py ../data/raw/sample_hdfs.log
@@ -60,7 +63,7 @@ python -m pytest tests/ -v
 | 3 | `sessionizer.py` | Session grouping (Block ID / sliding window) + vectorization |
 | 4 | `anomaly_gate.py` | Isolation Forest training & anomaly detection |
 | 5 | `embedder.py` / `vector_store.py` | Sentence-transformer embedding + FAISS indexing |
-| 6 | `rag_pipeline.py` | RAG prompt assembly + GPT-4o-mini analysis |
+| 6 | `rag_pipeline.py` | RAG prompt assembly + Anthropic analysis |
 
 ## CLI Options
 
@@ -93,9 +96,8 @@ Source: [LogHub](https://github.com/logpai/loghub)
 ## Tech Stack
 
 - **Python 3.10+**, **Drain3** (log parsing), **scikit-learn** (Isolation Forest)
-- **sentence-transformers** (embeddings), **FAISS** (vector search), **OpenAI GPT-4o-mini** (reasoning)
+- **sentence-transformers** (embeddings), **FAISS** (vector search), **Anthropic** (reasoning)
 
 ## Team
 
 LogSense — Vasanthakumar S, Atreyee Mondal, Dange Nikita Dilip, Sujith Shetty, Dhananjaya B R, Raj Shekhar, Balla Malleswara Rao, Aele Santhosh
-

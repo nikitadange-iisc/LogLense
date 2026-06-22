@@ -20,7 +20,7 @@ New log file
     ↓ Embed flagged session text (sentence-transformer)
     ↓ FAISS search → top-K similar historical failures
     ↓ Assemble prompt: [flagged lines] + [top-K retrieved examples]
-    ↓ GPT-4o-mini → root cause + line-level failure trace
+    ↓ Anthropic → root cause + line-level failure trace
 ```
 
 ## Stage 1: Streaming Ingestion & Deduplication
@@ -96,13 +96,13 @@ New log file
 
 - At inference, embed the flagged session and retrieve top-K similar historical failures from FAISS.
 - Assemble a prompt with the flagged lines + retrieved examples.
-- Pass to GPT-4o-mini (or equivalent LLM agent) for root cause identification and line-level failure trace output.
+- Pass to Anthropic for root cause identification and line-level failure trace output.
 
 ### Implementation Steps
 1. Embed incoming flagged session using the same sentence-transformer model.
 2. Query FAISS index for top-K (e.g., K=3) nearest neighbors.
 3. Build prompt template combining: flagged log lines + top-K retrieved failure examples + instructions for output format.
-4. Call GPT-4o-mini (or Claude API) with assembled prompt, optionally via an agent loop for multi-step reasoning (e.g., tool calls to re-query FAISS or fetch additional context).
+4. Call Anthropic with assembled prompt, optionally via an agent loop for multi-step reasoning (e.g., tool calls to re-query FAISS or fetch additional context).
 5. Parse response into structured output: affected line range, root cause description, confidence/explanation.
 
 ## Project File Structure
@@ -188,7 +188,7 @@ Each dataset includes ground-truth anomaly labels used for Isolation Forest trai
 - **ML**: scikit-learn (Isolation Forest)
 - **Embeddings**: sentence-transformers (`all-mpnet-base-v2` primary, `all-MiniLM-L6-v2` fallback)
 - **Vector Store**: FAISS
-- **LLM/Agent**: GPT-4o-mini (primary), Claude API (alternative/fallback)
+- **LLM/Agent**: Anthropic
 - **Orchestration**: Python scripts / agentic framework (e.g., LangGraph) for multi-step reasoning
 
 
