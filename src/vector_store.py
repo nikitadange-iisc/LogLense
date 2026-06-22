@@ -20,11 +20,12 @@ logger = logging.getLogger(__name__)
 class FAISSVectorStore:
     """FAISS-based vector store for anomalous session embeddings."""
 
-    def __init__(self, dimension: int = 384, index_type: str = "flat",
+    def __init__(self, dimension: int = 768, index_type: str = "flat",
                  index_path: str = "models/faiss_index"):
         """
         Args:
-            dimension: Embedding dimension (384 for all-MiniLM-L6-v2).
+            dimension: Embedding dimension (must match the embedding model).
+                       768 for all-mpnet-base-v2, 384 for all-MiniLM-L6-v2.
             index_type: "flat" for IndexFlatL2, "ivf" for IndexIVFFlat.
             index_path: Directory for saving/loading the index.
         """
@@ -124,6 +125,16 @@ class FAISSVectorStore:
             self.metadata = pickle.load(f)
 
         logger.info(f"FAISS index loaded from {load_dir} ({self.index.ntotal} vectors)")
+
+    def reset(self) -> None:
+        """Discard all vectors and metadata, rebuilding an empty index."""
+        if self.index_type == "flat":
+            self.index = faiss.IndexFlatL2(self.dimension)
+        elif self.index_type == "ivf":
+            quantizer = faiss.IndexFlatL2(self.dimension)
+            self.index = faiss.IndexIVFFlat(quantizer, self.dimension, 100)
+        self.metadata = []
+        logger.info("FAISS index reset (dimension=%d)", self.dimension)
 
     def size(self) -> int:
         """Return the number of vectors in the index."""

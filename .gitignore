@@ -22,6 +22,9 @@ data/raw/preprocessed/
 !data/raw/sample_hdfs.log
 !data/raw/sample_labels.csv
 data/processed/
+models
+all-MiniLM-L6-v2
+.pytest_cache
 
 # IDE
 .idea/
