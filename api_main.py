@@ -73,3 +73,13 @@ def history():
             out.append({"file":Path(f).name,"provider":d.get("llm_provider",d.get("provider","?")),"model":d.get("llm_model",d.get("model","?")),"analyzed":d.get("sessions_analysed",len(d.get("results",[]))),"mtime":os.path.getmtime(f)})
         except: pass
     return {"history":out}
+
+
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+app.mount("/ui", StaticFiles(directory="ui"), name="ui")
+
+@app.get("/")
+def index():
+    return FileResponse("ui/index.html")
