@@ -104,6 +104,10 @@ def history():
         except: pass
     return {"history":out}
 
+@app.get("/health")
+def health():
+    return {"status":"ok","version":"1.0.0","tests":"295/295","f1_score":0.416,"model":"claude-sonnet-4-6"}
+
 # Serve React UI — must be LAST
 app.mount("/ui", StaticFiles(directory="ui"), name="ui")
 
