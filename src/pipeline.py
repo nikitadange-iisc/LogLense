@@ -21,9 +21,11 @@ from datetime import datetime
 
 import numpy as np
 
-from ingestion import stream_deduplicated, deduplicate_stream
-from log_parser import LogParser
-from sessionizer import Sessionizer, Session
+from module1_ingest_parse import run_module1
+from module2_session_anomaly import run_module2
+from module3_embed_index import run_module3
+from module4_rag_analysis import run_module4
+from sessionizer import Sessionizer, Session, load_events_from_csv
 from anomaly_gate import AnomalyGate
 from embedder import SessionEmbedder
 from vector_store import FAISSVectorStore
@@ -65,22 +67,13 @@ class LogSensePipeline:
         logger.info(f"LogSense pipeline initialized (dataset={self.dataset_type})")
 
     @property
-    def parser(self):
-        if self._parser is None:
-            self._parser = LogParser(
-                dataset=self.dataset_type,
-                state_dir=str(self.model_dir / "drain_state"),
-            )
-        return self._parser
-
-    @property
     def sessionizer(self):
         if self._sessionizer is None:
             method = "block_id" if self.dataset_type == "hdfs" else "sliding_window"
             self._sessionizer = Sessionizer(
                 method=method,
-                window_size=self.config.get("window_size", 50),
-                step_size=self.config.get("step_size", 25),
+                window_size=self.config.get("window_size", 20),
+                step_size=self.config.get("step_size", 10),
             )
         return self._sessionizer
 
@@ -97,7 +90,7 @@ class LogSensePipeline:
     def embedder(self):
         if self._embedder is None:
             self._embedder = SessionEmbedder(
-                model_name=self.config.get("embedding_model", "all-mpnet-base-v2")
+                model_name=self.config.get("embedding_model", "all-MiniLM-L6-v2")
             )
         return self._embedder
 
@@ -122,67 +115,68 @@ class LogSensePipeline:
             )
         return self._rag_pipeline
 
-    # ── Stage 1: Ingestion & Deduplication ──────────────────────────────
+    # ── Stages 1 + 2: Ingestion, Deduplication & Drain Parsing ─────────
+    # Both stages are now handled by run_module1(), which streams the raw
+    # log, deduplicates, runs Drain, and writes a structured CSV.
 
     def run_ingestion(self, input_path: str, output_path: str = None) -> dict:
-        """Run Stage 1: Streaming ingestion and deduplication."""
+        """Stub — dedup is handled inside run_parsing() via run_module1()."""
+        logger.info("Stage 1 (dedup) is handled by Module 1 inside run_parsing()")
+        return {"status": "handled_by_module1"}
+
+    def run_parsing(self, input_path: str, max_lines: int = None) -> str:
+        """
+        Run Module 1 (ingestion + Drain parsing) and return the CSV path.
+
+        The returned CSV is the input to run_sessionization().
+        """
         logger.info("=" * 60)
-        logger.info("STAGE 1: Streaming Ingestion & Deduplication")
-        logger.info("=" * 60)
-
-        start = time.time()
-        stats = deduplicate_stream(input_path, output_path)
-        stats["duration_sec"] = round(time.time() - start, 2)
-
-        logger.info(f"Stage 1 complete in {stats['duration_sec']}s")
-        return stats
-
-    # ── Stage 2: Parsing ────────────────────────────────────────────────
-
-    def run_parsing(self, input_path: str, max_lines: int = None) -> list:
-        """Run Stage 2: Log parsing with Drain."""
-        logger.info("=" * 60)
-        logger.info("STAGE 2: Log Parsing with Drain")
+        logger.info("STAGES 1+2: Ingestion & Drain Parsing (Module 1)")
         logger.info("=" * 60)
 
-        start = time.time()
-        parsed_events = []
-
-        for parsed in self.parser.parse_stream(stream_deduplicated(input_path)):
-            parsed_events.append(parsed)
-            if max_lines and len(parsed_events) >= max_lines:
-                break
-
-        duration = round(time.time() - start, 2)
-        logger.info(f"Stage 2 complete in {duration}s — "
-                     f"{len(parsed_events)} events, "
-                     f"{self.parser.get_template_count()} templates")
-
-        self.parser.save_state()
-        return parsed_events
+        result = run_module1(
+            input_path=input_path,
+            dataset=self.dataset_type,
+            max_lines=max_lines,
+        )
+        self._module1_result = result
+        logger.info("Module 1 complete — CSV: %s", result["csv_path"])
+        return result["csv_path"]
 
     # ── Stage 3: Session Grouping & Vectorization ───────────────────────
 
-    def run_sessionization(self, parsed_events: list,
+    def run_sessionization(self, csv_path: str,
                            label_path: str = None) -> tuple:
-        """Run Stage 3: Session grouping and vectorization."""
+        """
+        Run Stage 3: load events from Module 1 CSV, sessionize, vectorize.
+
+        Args:
+            csv_path   : Path to the structured CSV written by run_parsing().
+            label_path : HDFS anomaly_label.csv (optional; ignored for BGL/TB).
+        """
         logger.info("=" * 60)
         logger.info("STAGE 3: Session Grouping & Vectorization")
         logger.info("=" * 60)
 
-        start = time.time()
+        start  = time.time()
+        events = load_events_from_csv(csv_path, self.dataset_type)
 
-        sessions = self.sessionizer.create_sessions(iter(parsed_events))
+        sessions = self.sessionizer.create_sessions(iter(events))
 
-        if label_path:
+        if label_path and self.dataset_type == "hdfs":
             sessions = self.sessionizer.load_labels(label_path, sessions)
+        elif self.dataset_type in ("bgl", "thunderbird"):
+            sessions = self.sessionizer.assign_labels_from_events(sessions)
 
         sessions, vocabulary = self.sessionizer.vectorize_all(sessions)
         self._vocabulary = vocabulary
 
+        vocab_path = str(self.model_dir / "event_columns.json")
+        self.sessionizer.save_vocabulary(vocabulary, vocab_path)
+
         duration = round(time.time() - start, 2)
-        logger.info(f"Stage 3 complete in {duration}s — "
-                     f"{len(sessions)} sessions, vocab size {len(vocabulary)}")
+        logger.info("Stage 3 complete in %.1fs — %d sessions, vocab=%d",
+                    duration, len(sessions), len(vocabulary))
 
         return sessions, vocabulary
 
@@ -250,74 +244,44 @@ class LogSensePipeline:
     # ── Stage 5: Embedding & FAISS Index ────────────────────────────────
 
     def run_embedding_indexing(self, anomalous_sessions: list,
-                                load_existing: bool = False) -> None:
+                                load_existing: bool = False) -> dict:
         """
         Run Stage 5: Embed anomalous sessions and build FAISS index.
 
         Args:
             anomalous_sessions: List of anomalous Session objects.
             load_existing: If True, load existing FAISS index instead of building.
+
+        Returns:
+            Result dict from run_module3 (or load summary if load_existing).
         """
         logger.info("=" * 60)
         logger.info("STAGE 5: Embedding & FAISS Vector Store")
         logger.info("=" * 60)
 
-        start = time.time()
-
         if load_existing:
             self.vector_store.load()
-            logger.info(f"Loaded existing FAISS index with {self.vector_store.size()} vectors")
-        else:
-            if not anomalous_sessions:
-                logger.warning("No anomalous sessions to embed")
-                return
+            logger.info("Loaded existing FAISS index (%d vectors)", self.vector_store.size())
+            return {"index_size": self.vector_store.size(), "loaded_existing": True}
 
-            # Batch embed
-            embeddings = self.embedder.embed_batch(anomalous_sessions)
-
-            # Build metadata
-            metadata_list = []
-            for session in anomalous_sessions:
-                event_sequence = []
-                previous = None
-                for event in session.events:
-                    template = event.get("event_template", "")
-                    event_id = event.get("event_template_id", "")
-                    item = f"E{event_id}: {template}" if event_id != "" else template
-                    if item and item != previous:
-                        event_sequence.append(item)
-                        previous = item
-
-                severity_counts = {}
-                for event in session.events:
-                    level = event.get("level", "UNKNOWN")
-                    severity_counts[level] = severity_counts.get(level, 0) + 1
-
-                metadata_list.append({
-                    "session_id": session.session_id,
-                    "raw_lines": session.raw_lines[:100],  # Limit stored lines
-                    "line_range": session.line_range,
-                    "label": session.label,
-                    "root_cause": session.label if session.label else "Unknown",
-                    "event_sequence": event_sequence[:50],
-                    "severity_counts": severity_counts,
-                    "anomaly_score": getattr(session, "anomaly_score", None),
-                })
-
-            # Add to FAISS index
-            self.vector_store.add(embeddings, metadata_list)
-            self.vector_store.save()
-
-        duration = round(time.time() - start, 2)
-        logger.info(f"Stage 5 complete in {duration}s — "
-                     f"{self.vector_store.size()} vectors in index")
+        result = run_module3(
+            sessions=anomalous_sessions,
+            dataset=self.dataset_type,
+            embedding_model=self.config.get("embedding_model", "all-mpnet-base-v2"),
+            index_dir=str(self.model_dir / "faiss_index"),
+            append=False,
+        )
+        # Keep lazy properties in sync with the objects run_module3 created
+        self._embedder     = result["embedder"]
+        self._vector_store = result["vector_store"]
+        return result
 
     # ── Stage 6: RAG Analysis ───────────────────────────────────────────
 
     def run_rag_analysis(self, sessions: list, top_k: int = 3,
                           offline: bool = False) -> list:
         """
-        Run Stage 6: Retrieval-augmented analysis.
+        Run Stage 6: Retrieval-augmented analysis via run_module4.
 
         Args:
             sessions: List of anomalous Session objects to analyze.
@@ -328,25 +292,23 @@ class LogSensePipeline:
             List of analysis result dicts.
         """
         logger.info("=" * 60)
-        logger.info("STAGE 6: Retrieval-Augmented Agentic Reasoning")
+        logger.info("STAGE 6: Retrieval-Augmented Agentic Reasoning (Module 4)")
         logger.info("=" * 60)
 
-        start = time.time()
-        top_k = self.config.get("top_k", top_k)
-
-        if offline:
-            results = []
-            for session in sessions:
-                result = self.rag_pipeline.analyze_offline(session, top_k=top_k)
-                results.append(result)
-        else:
-            results = self.rag_pipeline.analyze_batch(sessions, top_k=top_k)
-
-        duration = round(time.time() - start, 2)
-        logger.info(f"Stage 6 complete in {duration}s — "
-                     f"{len(results)} sessions analyzed")
-
-        return results
+        result = run_module4(
+            anomaly_json    = None,
+            sessions        = sessions,
+            dataset         = self.dataset_type,
+            index_dir       = str(self.model_dir / "faiss_index"),
+            embedding_model = self.config.get("embedding_model", "all-MiniLM-L6-v2"),
+            llm_provider    = self.config.get("llm_provider", "auto"),
+            llm_model       = self.config.get("llm_model"),
+            top_k           = self.config.get("top_k", top_k),
+            max_sessions    = len(sessions),
+            offline         = offline,
+        )
+        self._rag_pipeline = result["rag_pipeline"]
+        return result["results"]
 
     # ── Full Pipeline ───────────────────────────────────────────────────
 
@@ -377,21 +339,20 @@ class LogSensePipeline:
 
         results = {"input_path": input_path, "dataset_type": self.dataset_type}
 
-        # Stage 1: Ingestion
-        ingestion_stats = self.run_ingestion(input_path)
-        results["stage1_ingestion"] = ingestion_stats
-
-        # Stage 2: Parsing
-        parsed_events = self.run_parsing(input_path, max_lines=max_lines)
+        # Stages 1+2: Module 1 (ingestion + Drain parsing -> CSV)
+        csv_path = self.run_parsing(input_path, max_lines=max_lines)
+        m1 = getattr(self, "_module1_result", {})
+        results["stage1_ingestion"] = {"status": "handled_by_module1"}
         results["stage2_parsing"] = {
-            "total_events": len(parsed_events),
-            "template_count": self.parser.get_template_count(),
+            "total_events":   m1.get("dedup_lines", 0),
+            "template_count": m1.get("template_count", 0),
+            "csv_path":       csv_path,
         }
 
-        # Stage 3: Sessionization
-        sessions, vocabulary = self.run_sessionization(parsed_events, label_path)
+        # Stage 3: Sessionization (reads from CSV)
+        sessions, vocabulary = self.run_sessionization(csv_path, label_path)
         results["stage3_sessionization"] = {
-            "total_sessions": len(sessions),
+            "total_sessions":  len(sessions),
             "vocabulary_size": len(vocabulary),
         }
 
@@ -404,9 +365,12 @@ class LogSensePipeline:
         }
 
         # Stage 5: Embedding & Indexing
-        self.run_embedding_indexing(anomalous)
+        m3 = self.run_embedding_indexing(anomalous)
         results["stage5_embedding"] = {
-            "indexed_vectors": self.vector_store.size(),
+            "indexed_vectors": m3.get("index_size", 0),
+            "embedding_model": m3.get("embedding_model"),
+            "embedding_dim":   m3.get("embedding_dim"),
+            "processing_time": m3.get("processing_time"),
         }
 
         # Stage 6: RAG Analysis (on a subset)
@@ -446,14 +410,14 @@ class LogSensePipeline:
         total_duration = round(time.time() - pipeline_start, 2)
         results["total_duration_sec"] = total_duration
 
-        compression = len(parsed_events) - len(sessions_to_analyze) if parsed_events else 0
+        total_events = m1.get("total_lines", 0) or m1.get("dedup_lines", 0)
         results["summary"] = {
-            "total_lines_processed": len(parsed_events),
-            "sessions_created": len(sessions),
-            "anomalous_sessions": len(anomalous),
-            "sessions_sent_to_llm": len(sessions_to_analyze),
-            "compression_efficiency": f"{(compression/max(len(parsed_events),1))*100:.1f}%",
-            "total_duration_sec": total_duration,
+            "total_lines_processed":  total_events,
+            "sessions_created":       len(sessions),
+            "anomalous_sessions":     len(anomalous),
+            "sessions_sent_to_llm":   len(sessions_to_analyze),
+            "compression_efficiency": f"{(1 - len(anomalous)/max(len(sessions),1))*100:.1f}%",
+            "total_duration_sec":     total_duration,
         }
 
         logger.info("=" * 70)

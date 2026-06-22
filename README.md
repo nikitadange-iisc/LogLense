@@ -1,103 +1,138 @@
 # LogSense: Agentic AI Framework for Root Cause Analysis of Large-Scale System Logs
 
-An end-to-end multi-stage retrieval-augmented agentic pipeline that compresses log volume before LLM involvement, enabling precise anomaly explanation and failure trace identification at scale.
+An end-to-end, multi-stage retrieval-augmented pipeline that compresses log volume before any LLM involvement, enabling precise anomaly detection, root cause identification, and failure trace generation at scale.
 
 ## Architecture
-
-```
 Raw Log File
-    ↓ Stage 1: Streaming ingestion + deduplication
-    ↓ Stage 2: Drain algorithm → event templates
-    ↓ Stage 3: Session grouping (Block ID / sliding window) → count vectors
-    ↓ Stage 4: Isolation Forest → anomaly scoring & gating
-    ↓ Stage 5: Sentence-transformer embedding → FAISS indexing
-    ↓ Stage 6: RAG prompt assembly → Anthropic root cause analysis
-```
 
-## Quick Start
+↓
 
-### 1. Install Dependencies
+Module 1 — Ingestion & Drain Parsing      → data/processed/<dataset>_structured.csv
+
+↓
+
+Module 2 — Session Anomaly Detection      → data/processed/<dataset>_anomalies.json
+
+↓
+
+Module 3 — Sentence Embedding & FAISS     → models/faiss_index/
+
+↓
+
+Module 4 — RAG Root Cause Analysis        → data/processed/<dataset>_rag_results.json
+## Setup
 
 ```bash
 pip install -r requirements.txt
-```
-
-### 2. Configure Environment
-
-```bash
 cp .env.example .env
-# Edit .env with your Anthropic API key
+# Add your ANTHROPIC_API_KEY to .env
 ```
 
-### 3. Run with Sample Data
+## Run UI (Single Command)
 
 ```bash
-cd src
-
-# Full pipeline (offline mode — no LLM API calls)
-python pipeline.py ../data/raw/sample_hdfs.log -l ../data/raw/sample_labels.csv -d hdfs --offline
-
-# Full pipeline with Anthropic analysis
-python pipeline.py ../data/raw/sample_hdfs.log -l ../data/raw/sample_labels.csv -d hdfs
-
-# Module 4 inference entry point
-python inference_pipeline.py ../data/raw/sample_hdfs.log -l ../data/raw/sample_labels.csv -d hdfs --max-analyze 5
-
-# Run individual stages
-python ingestion.py ../data/raw/sample_hdfs.log
-python parser.py ../data/raw/sample_hdfs.log -n 100
+uvicorn api_main:app --port 8001 --reload
 ```
 
-### 4. Run Tests
+Open browser: **http://localhost:8001**
+
+## Run Pipeline (CLI)
+
+```bash
+# Module 1
+python src/module1_ingest_parse.py data/raw/HDFS_sample_1pct.log --dataset hdfs
+
+# Module 2
+python src/module2_session_anomaly.py data/processed/HDFS_sample_1pct_structured.csv \
+    --dataset hdfs --label-path data/raw/anomaly_label.csv --contamination 0.03
+
+# Module 3
+python src/module3_embed_index.py data/processed/HDFS_sample_1pct_anomalies.json \
+    --dataset hdfs --model all-MiniLM-L6-v2
+
+# Module 4
+python src/module4_rag_analysis.py data/processed/HDFS_sample_1pct_anomalies.json \
+    --dataset hdfs --max-sessions 5
+```
+
+## Run Tests
 
 ```bash
 python -m pytest tests/ -v
 ```
 
-## Pipeline Stages
+**295/295 tests passing**
 
-| Stage | Module | Description |
-|-------|--------|-------------|
-| 1 | `ingestion.py` | Streaming file reader with consecutive deduplication |
-| 2 | `parser.py` | Drain3-based log parsing into event templates |
-| 3 | `sessionizer.py` | Session grouping (Block ID / sliding window) + vectorization |
-| 4 | `anomaly_gate.py` | Isolation Forest training & anomaly detection |
-| 5 | `embedder.py` / `vector_store.py` | Sentence-transformer embedding + FAISS indexing |
-| 6 | `rag_pipeline.py` | RAG prompt assembly + Anthropic analysis |
+## Key Results (HDFS Dataset)
 
-## CLI Options
-
-```
-python pipeline.py <input_file> [options]
-
-Options:
-  -l, --labels          Path to ground-truth labels CSV
-  -d, --dataset         Dataset type: hdfs, bgl, thunderbird
-  -n, --max-lines       Max lines to process (for testing)
-  --max-analyze         Max sessions to analyze with LLM (default: 10)
-  --offline             Skip LLM calls, generate prompts only
-  --no-train            Load existing model instead of training
-  --contamination       Isolation Forest contamination (default: 0.1)
-  --window-size         Sliding window size for BGL/Thunderbird (default: 50)
-  --top-k               Similar examples to retrieve (default: 3)
-  -v, --verbose         Enable debug logging
-```
-
-## Datasets
-
-Source: [LogHub](https://github.com/logpai/loghub)
-
-| Dataset | Size | Sessionization |
-|---------|------|---------------|
-| HDFS | ~11M lines | Block ID grouping |
-| BGL | ~4.7M lines | Sliding window |
-| Thunderbird | ~211M lines | Sliding window |
+| Metric | Value |
+|---|---|
+| Lines processed | 99,805 |
+| Sessions created | 7,940 |
+| Anomalies detected | 307 (3.87%) |
+| Compression before LLM | 98.2% |
+| F1 Score | 0.416 |
+| Precision | 0.420 |
+| Recall | 0.412 |
+| Accuracy | 0.954 |
+| LLM Provider | Anthropic Claude Sonnet |
 
 ## Tech Stack
 
-- **Python 3.10+**, **Drain3** (log parsing), **scikit-learn** (Isolation Forest)
-- **sentence-transformers** (embeddings), **FAISS** (vector search), **Anthropic** (reasoning)
+| Component | Library | Version |
+|---|---|---|
+| Log parsing | drain3 | ≥0.9.11 |
+| Anomaly detection | scikit-learn IsolationForest | ≥1.3.0 |
+| Embedding | sentence-transformers | ≥2.2.2 |
+| Embedding model | all-MiniLM-L6-v2 | 384-dim |
+| Vector search | faiss-cpu | ≥1.7.4 |
+| LLM | anthropic Claude Sonnet | ≥0.75.0 |
+| API backend | FastAPI + Uvicorn | ≥0.100.0 |
+| Frontend | React 17 (CDN) | No build step |
 
+## Project Structure
+LogLense/
+
+├── api_main.py              # FastAPI backend + React UI server
+
+├── ui/index.html            # React frontend (5 tabs)
+
+├── src/
+
+│   ├── module1_ingest_parse.py
+
+│   ├── module2_session_anomaly.py
+
+│   ├── module3_embed_index.py
+
+│   ├── module4_rag_analysis.py
+
+│   ├── pipeline.py
+
+│   ├── anomaly_gate.py
+
+│   ├── sessionizer.py
+
+│   ├── embedder.py
+
+│   ├── vector_store.py
+
+│   └── rag_pipeline.py
+
+├── tests/                   # 295 tests across 5 files
+
+├── data/
+
+│   ├── raw/                 # Input log files
+
+│   └── processed/           # Pipeline outputs
+
+├── models/                  # Trained models (auto-generated)
+
+├── requirements.txt
+
+└── .env.example
 ## Team
 
-LogSense — Vasanthakumar S, Atreyee Mondal, Dange Nikita Dilip, Sujith Shetty, Dhananjaya B R, Raj Shekhar, Balla Malleswara Rao, Aele Santhosh
+Vasanthakumar S, Atreyee Mondal, Dange Nikita Dilip, Sujith Shetty,
+Dhananjaya B R, Raj Shekhar, Balla Malleswara Rao, Aele Santhosh

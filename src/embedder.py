@@ -16,11 +16,15 @@ Improvements over v1:
 """
 
 import logging
+from pathlib import Path
 from typing import List, Optional
 
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+# Project root — used to resolve local model folders (e.g. all-MiniLM-L6-v2/)
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # Models ranked by retrieval quality (descending).  The first one that
 # loads successfully is used.
@@ -30,14 +34,29 @@ _MODEL_PRIORITY = [
 ]
 
 
+def _resolve_model_path(name: str) -> str:
+    """Return a local absolute path if the model folder exists inside the project, else return name as-is."""
+    local = _PROJECT_ROOT / name
+    if local.is_dir():
+        return str(local)
+    return name
+
+
+def _embedding_dim(model) -> int:
+    """Return embedding dimension, compatible with both old and new sentence-transformers API."""
+    if hasattr(model, "get_embedding_dimension"):
+        return model.get_embedding_dimension()
+    return model.get_sentence_embedding_dimension()
+
+
 class SessionEmbedder:
     """Embeds log sessions using sentence-transformers."""
 
     def __init__(self, model_name: str = "all-mpnet-base-v2"):
         """
         Args:
-            model_name: Sentence-transformer model name.  If the
-                        requested model cannot be loaded the embedder
+            model_name: Sentence-transformer model name or local folder path.
+                        If the requested model cannot be loaded the embedder
                         automatically falls back through a priority list,
                         and ultimately to a TF-IDF fallback if no
                         sentence-transformer model is available.
@@ -54,10 +73,11 @@ class SessionEmbedder:
 
             for name in models_to_try:
                 try:
-                    logger.info(f"Loading sentence-transformer model: {name}")
-                    self.model = SentenceTransformer(name)
-                    self.model_name = name
-                    self.dimension = self.model.get_sentence_embedding_dimension()
+                    resolved = _resolve_model_path(name)
+                    logger.info(f"Loading sentence-transformer model: {resolved}")
+                    self.model = SentenceTransformer(resolved)
+                    self.model_name = name          # keep short name for display
+                    self.dimension = _embedding_dim(self.model)
                     logger.info(
                         f"Model loaded: {self.model_name} — "
                         f"embedding dimension: {self.dimension}"
@@ -126,7 +146,7 @@ class SessionEmbedder:
         if events:
             level_counts: dict = {}
             for ev in events:
-                lvl = ev.get("level", "UNKNOWN")
+                lvl = ev.get("level", "UNKNOWN") if isinstance(ev, dict) else "UNKNOWN"
                 level_counts[lvl] = level_counts.get(lvl, 0) + 1
             if any(k in level_counts for k in ("ERROR", "FATAL", "CRITICAL",
                                                  "WARN", "WARNING")):
@@ -139,7 +159,7 @@ class SessionEmbedder:
             templates = []
             prev = None
             for ev in events:
-                t = ev.get("event_template", "")
+                t = ev.get("event_template", "") if isinstance(ev, dict) else str(ev)
                 if t != prev:
                     templates.append(t)
                     prev = t
@@ -150,7 +170,7 @@ class SessionEmbedder:
             templates = []
             prev = None
             for ev in events:
-                t = ev.get("event_template", "")
+                t = ev.get("event_template", "") if isinstance(ev, dict) else str(ev)
                 if t != prev:
                     templates.append(t)
                     prev = t
@@ -237,24 +257,39 @@ class SessionEmbedder:
 
     def _tfidf_embed_texts(self, texts: list) -> np.ndarray:
         """Embed texts using TF-IDF + SVD (offline fallback)."""
+        target_dim = self.dimension  # fixed output dimension — never mutate self.dimension
         if not self._fitted:
-            # Fit on the provided texts (first batch)
             tfidf_matrix = self._tfidf.fit_transform(texts)
-            # Handle case where n_features < n_components
-            n_components = min(self.dimension, tfidf_matrix.shape[1], tfidf_matrix.shape[0])
+            # Cap SVD components to what the matrix can support (docs × features)
+            n_components = min(target_dim, tfidf_matrix.shape[1], tfidf_matrix.shape[0])
+            self._fitted = True
+            if n_components < 2:
+                # TruncatedSVD requires ≥ 2 features; return padded raw TF-IDF instead
+                self._svd_fitted = False
+                dense = tfidf_matrix.toarray().astype(np.float32)
+                if dense.shape[1] < target_dim:
+                    pad = np.zeros((dense.shape[0], target_dim - dense.shape[1]))
+                    dense = np.hstack([dense, pad])
+                return dense
             if n_components < self._svd.n_components:
                 self._svd.n_components = n_components
-                self.dimension = n_components
             self._svd.fit(tfidf_matrix)
-            self._fitted = True
+            self._svd_fitted = True
             embeddings = self._svd.transform(tfidf_matrix)
         else:
             tfidf_matrix = self._tfidf.transform(texts)
+            if not getattr(self, "_svd_fitted", True):
+                # SVD was skipped on first fit (too few features)
+                dense = tfidf_matrix.toarray().astype(np.float32)
+                if dense.shape[1] < target_dim:
+                    pad = np.zeros((dense.shape[0], target_dim - dense.shape[1]))
+                    dense = np.hstack([dense, pad])
+                return dense
             embeddings = self._svd.transform(tfidf_matrix)
 
-        # Pad to target dimension if needed
-        if embeddings.shape[1] < self.dimension:
-            pad = np.zeros((embeddings.shape[0], self.dimension - embeddings.shape[1]))
+        # Always pad to target_dim so output shape is constant regardless of corpus size
+        if embeddings.shape[1] < target_dim:
+            pad = np.zeros((embeddings.shape[0], target_dim - embeddings.shape[1]))
             embeddings = np.hstack([embeddings, pad])
 
         return embeddings.astype(np.float32)
