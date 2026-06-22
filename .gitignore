@@ -37,7 +37,6 @@ all-MiniLM-L6-v2
 Thumbs.db
 
 # Logs
-*.log
 results_*.json
 
 data/raw/*.tar.gz
