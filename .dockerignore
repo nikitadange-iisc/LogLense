@@ -1,0 +1,16 @@
+frontend/node_modules/
+frontend/dist/
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+.git/
+.venv/
+venv/
+.env
+models/faiss_index/
+models/drain_state/
+data/raw/uploads/
+data/processed/
+*.log
+api/
+tests/
