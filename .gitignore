@@ -46,6 +46,6 @@ data/raw/*.log
 data/raw/HDFS*
 
 # Legacy / unused files
-api/
+/api/
 frontend/app.js
 frontend/styles.css

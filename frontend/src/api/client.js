@@ -1,4 +1,7 @@
+const RAILWAY = 'https://loglense-production.up.railway.app'
 const BASE = '/api'
+// Uploads go directly to Railway — Vercel's proxy times out on large files
+const UPLOAD_BASE = `${RAILWAY}/api`
 
 async function handleResponse(res) {
   if (!res.ok) {
@@ -12,20 +15,20 @@ export const uploadLog = (file, dataset) => {
   const form = new FormData()
   form.append('file', file)
   form.append('dataset', dataset)
-  return fetch(`${BASE}/upload`, { method: 'POST', body: form }).then(handleResponse)
+  return fetch(`${UPLOAD_BASE}/upload`, { method: 'POST', body: form }).then(handleResponse)
 }
 
 export const getStatus = () =>
-  fetch(`${BASE}/status`).then(handleResponse)
+  fetch(`${UPLOAD_BASE}/status`).then(handleResponse)
 
 export const cancelPipeline = () =>
-  fetch(`${BASE}/pipeline`, { method: 'DELETE' }).then(handleResponse)
+  fetch(`${UPLOAD_BASE}/pipeline`, { method: 'DELETE' }).then(handleResponse)
 
 export const resetPipeline = () =>
-  fetch(`${BASE}/reset`, { method: 'POST' }).then(handleResponse)
+  fetch(`${UPLOAD_BASE}/reset`, { method: 'POST' }).then(handleResponse)
 
 export const tryout = () =>
-  fetch(`${BASE}/tryout`, { method: 'POST' }).then(handleResponse)
+  fetch(`${UPLOAD_BASE}/tryout`, { method: 'POST' }).then(handleResponse)
 
 export const getHistory = () =>
   fetch(`${BASE}/history`).then(handleResponse)
