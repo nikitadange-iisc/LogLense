@@ -1,0 +1,31 @@
+stages:
+  - build
+  - deploy
+
+# ── Frontend → GitLab Pages ──────────────────────────────────────────────────
+build-frontend:
+  stage: build
+  image: node:20-alpine
+  cache:
+    paths:
+      - frontend/node_modules/
+  script:
+    - cd frontend
+    - npm ci
+    - npm run build
+  artifacts:
+    paths:
+      - frontend/dist/
+
+pages:
+  stage: deploy
+  dependencies:
+    - build-frontend
+  script:
+    # GitLab Pages serves from a folder called "public" at the repo root
+    - mv frontend/dist public
+  artifacts:
+    paths:
+      - public
+  only:
+    - main
