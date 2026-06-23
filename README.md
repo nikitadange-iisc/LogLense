@@ -1,4 +1,4 @@
-# LogSense: Agentic AI Framework for Root Cause Analysis of Large-Scale System Logs
+# LogSense: LLM based Analysis of Large-Scale System Logs
 
 An end-to-end, multi-stage retrieval-augmented pipeline that compresses log volume before any LLM involvement, enabling precise anomaly detection, root cause identification, and failure trace generation at scale.
 
@@ -474,76 +474,6 @@ data/processed/<ds>_rag_results.json Final results / downstream dashboards
 
 > **Important:** Run modules in order. Module 3 and 4 both read from Module 2's
 > `_anomalies.json` — Module 3 to build the knowledge base, Module 4 to query it.
-
----
-
-## Additional Capabilities & Enhancements
-
-The following improvements were made beyond the original architecture:
-
-### Anomaly Detection Improvements (Module 2)
-
-**Isolation Forest contamination bug fix**
-The original code used `contamination='auto'` when labelled-normal sessions were available, which is sklearn's fixed -0.5 threshold (~17% flagged) instead of the user's specified value. Fixed to use the user's `--contamination` value in all training paths.
-- HDFS result: flagged sessions dropped from 1,417 (17.8%) to 302 (3.8%), F1 improved from 0.18 → 0.41.
-
-**Node-based sessionization for BGL**
-The original BGL implementation used a sliding window (9,999 windows of 50 events). Fault bursts are concentrated on specific nodes, so sliding windows dilute the signal by mixing normal events from other nodes. The new `node` method groups all events from the same Node ID together, concentrating fault events per session.
-- BGL F1 improved from 0.015 → 0.061 with this change alone.
-
-**Binary×IDF weighting for BGL**
-Standard count vectorization gives huge weight to high-frequency normal events (E1 appearing 4,865 times per node). Binary×IDF weighting (`(count > 0) × IDF`) removes this length bias: a FATAL event appearing once gets the same presence weight as E1, and IDF de-emphasises templates that appear in many sessions.
-- BGL F1 improved from 0.061 → 0.493 with binary×IDF.
-
-### Embedding & Indexing Improvements (Module 3)
-
-**Normal-session filter**
-The FAISS index is a reference knowledge base of *known* anomalies. The original code indexed all 302 HDFS sessions (175 Normal + 127 Anomaly) and all 1,102 BGL sessions (590 Normal + 512 Anomaly). Normal-labelled sessions are Isolation Forest false positives and corrupt retrieval quality. The filter ensures only confirmed anomalies enter the index.
-
-**Local model path resolution**
-`SessionEmbedder` now checks `<project_root>/<model_name>` before attempting a HuggingFace download. The bundled `all-MiniLM-L6-v2/` folder is found automatically — no internet access required.
-
-**sentence-transformers API compatibility**
-Fixed `get_sentence_embedding_dimension()` → `get_embedding_dimension()` for sentence-transformers v5.x, with backward-compatible wrapper for older versions.
-
-**TF-IDF dimension stability fix**
-The TF-IDF fallback embedder (used when sentence-transformers is unavailable) previously mutated `self.dimension` during fitting, causing FAISS dimension mismatches when the corpus was small. Fixed by saving the target dimension before any SVD truncation and always padding output to the declared dimension.
-
-**FAISS compatibility upgrade**
-Upgraded `faiss-cpu` from 1.7.4 → 1.14.3 for numpy 2.x compatibility (`swig_ptr` was rejecting valid float32 arrays on numpy 2.0+).
-
-**Manual anomaly ingestion**
-Users can inject their own known anomaly files into the FAISS index without re-running the full pipeline. Three formats are auto-detected by extension:
-- `.json` — same structure as Module 2 anomalies output
-- `.txt` / `.log` — raw log lines, windowed into 50-line sessions
-- `.csv` — Module 1 structured CSV, re-sessionized by dataset method
-
-**Append mode**
-`--append` adds new vectors to an existing index without discarding previous ones. This allows building a multi-dataset index incrementally (e.g., run HDFS first, then append BGL).
-
-### RAG Pipeline Improvements (Module 4)
-
-**Auto-detect LLM provider**
-Module 4 checks environment variables in order: `ANTHROPIC_API_KEY` → Claude (claude-sonnet-4-6), `OPENAI_API_KEY` → OpenAI (gpt-4o-mini), neither → offline mode. No code changes needed when switching providers.
-
-**Claude (Anthropic) support**
-Added full Claude API integration using the Anthropic SDK alongside the existing OpenAI integration. Response parsing handles Claude's tendency to wrap JSON in markdown code fences.
-
-**Dataset-aware system prompts**
-The LLM system prompt is tailored to the dataset:
-- **HDFS**: explains DataNode/NameNode roles, block replication, pipeline errors
-- **BGL**: explains machine check exceptions, RAS events, FATAL hardware faults, ciod I/O daemon
-- **Thunderbird**: explains sliding-window context, kernel panic patterns
-
-**Accurate prompt context**
-The original `build_prompt` showed `"Known Root Cause: Unknown"` for every retrieved example because the FAISS metadata has no `root_cause` field. Replaced with the actual stored fields: `event_sequence`, `anomaly_score`, `label`, and the first 30 raw log lines. This gives the LLM real context to reason from.
-
-**Most-anomalous-first ordering**
-Sessions are sorted by `anomaly_score` ascending (most negative first) before the `--max-sessions` cap is applied, ensuring LLM API budget is spent on the worst anomalies first.
-
-**Hybrid embedding mode consistency**
-`retrieve_similar` now explicitly passes `mode="hybrid"` to `embed_session`, matching the mode used when sessions were indexed in Module 3.
-
 ---
 
 ## Testing
