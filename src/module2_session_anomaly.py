@@ -205,7 +205,9 @@ def run_module2(
         vecs   = np.array([s.vector for s in anomalous])
         scores = gate.score(vecs)
         for s, sc in zip(anomalous, scores):
-            anomaly_scores[s.session_id] = float(sc)
+            score = float(sc)
+            s.anomaly_score = score
+            anomaly_scores[s.session_id] = score
 
     # ── Step 8: Evaluate if labels are available ─────────────────────────
     labeled = [s for s in sessions if s.label is not None]
