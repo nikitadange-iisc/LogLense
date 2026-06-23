@@ -1,8 +1,15 @@
 """
 In-memory singleton that holds pipeline state across requests.
+Session history is persisted to disk so it survives server restarts.
 """
+import json
+import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
+_HISTORY_FILE = Path(__file__).resolve().parent.parent / "data" / "sessions_db.json"
 
 
 @dataclass
@@ -26,6 +33,8 @@ class AppState:
         # Module 3 embedding counters
         "embed_done":  0,
         "embed_total": 0,
+        # Set to the step name when an error occurs, so the UI can show ✗
+        "failed_at_step": None,
     })
     cancel_requested: bool = False
     sessions: list = field(default_factory=list)
@@ -34,6 +43,10 @@ class AppState:
     analysis_cache: dict = field(default_factory=dict)
     embedder: Any = None
     vector_store: Any = None
+    csv_path: str = ""        # path to Module 1 structured CSV
+    raw_log_path: str = ""    # path to the original uploaded file (for raw log viewer)
+    total_log_lines: int = 0  # cached line count for paginator
+    score_distribution: list = field(default_factory=list)  # [{score, label, is_anomalous}]
 
     # ChatGPT-style session history (newest first, in-memory per server run)
     session_history: list = field(default_factory=list)
@@ -58,6 +71,7 @@ class AppState:
 
     def set_error(self, message: str):
         self.job.update({
+            "failed_at_step": self.job.get("step"),  # capture which step failed
             "step":   "error",
             "status": "error",
             "message": message,
@@ -66,6 +80,10 @@ class AppState:
 
     def reset_for_new_run(self):
         self.cancel_requested = False
+        self.csv_path = ""
+        self.raw_log_path = ""
+        self.total_log_lines = 0
+        self.score_distribution = []
         self.job.update({
             "parsing_total": 0, "parsing_scanned": 0,
             "parsing_kept": 0,  "parsing_templates": 0,
@@ -73,15 +91,37 @@ class AppState:
             "m2_stage": "",
             "embed_done": 0,    "embed_total": 0,
             "stats": None,      "error": None,
+            "failed_at_step": None,
         })
 
     def save_to_history(self, record: dict):
-        """Prepend a completed session record (upsert by session_id)."""
+        """Prepend a completed session record (upsert by session_id) and persist to disk."""
         self.session_history = [
             r for r in self.session_history
             if r["session_id"] != record["session_id"]
         ]
         self.session_history.insert(0, record)
+        self._save_to_disk()
+
+    def _save_to_disk(self):
+        try:
+            _HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+            with open(_HISTORY_FILE, "w", encoding="utf-8") as f:
+                json.dump({"sessions": self.session_history}, f, indent=2)
+        except Exception as exc:
+            logger.warning("Could not save session history to disk: %s", exc)
+
+    def load_from_disk(self):
+        """Load persisted session history on server startup."""
+        if not _HISTORY_FILE.exists():
+            return
+        try:
+            with open(_HISTORY_FILE, encoding="utf-8") as f:
+                data = json.load(f)
+            self.session_history = data.get("sessions", [])
+            logger.info("Loaded %d past sessions from disk", len(self.session_history))
+        except Exception as exc:
+            logger.warning("Could not load session history from disk: %s", exc)
 
 
 app_state = AppState()

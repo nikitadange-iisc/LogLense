@@ -10,6 +10,7 @@ import types
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 from fastapi.concurrency import run_in_threadpool
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -77,6 +78,59 @@ async def list_history():
     ]
 
 
+@router.delete("/history/{session_id}")
+async def delete_session(session_id: str):
+    """Remove a past session from history (and disk). Also clears active state if it was active."""
+    record = next((r for r in app_state.session_history if r["session_id"] == session_id), None)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Session not found.")
+
+    app_state.session_history = [
+        r for r in app_state.session_history if r["session_id"] != session_id
+    ]
+    app_state._save_to_disk()
+
+    # If this was the currently loaded session, reset to idle
+    if app_state.active_session_id == session_id:
+        app_state.sessions            = []
+        app_state.rag_pipeline        = None
+        app_state.analysis_cache      = {}
+        app_state.active_session_id   = ""
+        app_state.csv_path            = ""
+        app_state.raw_log_path        = ""
+        app_state.total_log_lines     = 0
+        app_state.score_distribution  = []
+        if app_state.job.get("step") == "ready":
+            app_state.job.update({
+                "step": "idle", "status": "idle",
+                "message": "Session deleted.", "progress_pct": 0, "stats": None,
+            })
+
+    logger.info("Deleted session %s", session_id)
+    return {"status": "deleted", "session_id": session_id}
+
+
+class _RenameBody(BaseModel):
+    filename: str
+
+
+@router.patch("/history/{session_id}")
+async def rename_session(session_id: str, body: _RenameBody):
+    """Rename the display name of a past session."""
+    record = next((r for r in app_state.session_history if r["session_id"] == session_id), None)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Session not found.")
+
+    new_name = body.filename.strip()
+    if not new_name:
+        raise HTTPException(status_code=422, detail="Name cannot be empty.")
+
+    record["filename"] = new_name
+    app_state._save_to_disk()
+    logger.info("Renamed session %s → %s", session_id, new_name)
+    return {"status": "renamed", "session_id": session_id, "filename": new_name}
+
+
 @router.post("/history/{session_id}/activate")
 async def activate_session(session_id: str):
     """Load a past session as the active pipeline (enables dashboard + chat)."""
@@ -96,12 +150,16 @@ async def activate_session(session_id: str):
         logger.error("Failed to activate session %s: %s", session_id, exc)
         raise HTTPException(status_code=500, detail=f"Failed to load session: {exc}")
 
-    app_state.sessions         = sessions
-    app_state.rag_pipeline     = rag
-    app_state.embedder         = embedder
-    app_state.vector_store     = store
-    app_state.analysis_cache   = dict(record.get("analysis_cache", {}))
-    app_state.active_session_id = session_id
+    app_state.sessions           = sessions
+    app_state.rag_pipeline       = rag
+    app_state.embedder           = embedder
+    app_state.vector_store       = store
+    app_state.analysis_cache     = dict(record.get("analysis_cache", {}))
+    app_state.active_session_id  = session_id
+    app_state.csv_path           = record.get("csv_path", "")
+    app_state.raw_log_path       = record.get("raw_log_path", "")
+    app_state.total_log_lines    = record.get("total_log_lines", 0)
+    app_state.score_distribution = record.get("score_distribution", [])
     app_state.index_stats      = {
         "size":            record["stats"].get("index_size", 0),
         "dataset":         record["dataset"],

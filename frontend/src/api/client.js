@@ -1,7 +1,4 @@
-const RAILWAY = 'https://loglense-production.up.railway.app'
 const BASE = '/api'
-// Uploads go directly to Railway — Vercel's proxy times out on large files
-const UPLOAD_BASE = `${RAILWAY}/api`
 
 async function handleResponse(res) {
   if (!res.ok) {
@@ -11,24 +8,52 @@ async function handleResponse(res) {
   return res.json()
 }
 
-export const uploadLog = (file, dataset) => {
-  const form = new FormData()
-  form.append('file', file)
-  form.append('dataset', dataset)
-  return fetch(`${UPLOAD_BASE}/upload`, { method: 'POST', body: form }).then(handleResponse)
+export const uploadLog = (file, dataset, onProgress) => {
+  return new Promise((resolve, reject) => {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('dataset', dataset)
+
+    const xhr = new XMLHttpRequest()
+
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable && onProgress) {
+        onProgress(Math.round((e.loaded / e.total) * 100))
+      }
+    })
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try { resolve(JSON.parse(xhr.responseText)) } catch { resolve({}) }
+      } else {
+        try {
+          const err = JSON.parse(xhr.responseText)
+          reject(new Error(err.detail || `HTTP ${xhr.status}`))
+        } catch {
+          reject(new Error(`HTTP ${xhr.status}`))
+        }
+      }
+    })
+
+    xhr.addEventListener('error', () => reject(new Error('Network error during upload')))
+    xhr.addEventListener('abort', () => reject(new Error('Upload aborted')))
+
+    xhr.open('POST', `${BASE}/upload`)
+    xhr.send(form)
+  })
 }
 
 export const getStatus = () =>
-  fetch(`${UPLOAD_BASE}/status`).then(handleResponse)
+  fetch(`${BASE}/status`).then(handleResponse)
 
 export const cancelPipeline = () =>
-  fetch(`${UPLOAD_BASE}/pipeline`, { method: 'DELETE' }).then(handleResponse)
+  fetch(`${BASE}/pipeline`, { method: 'DELETE' }).then(handleResponse)
 
 export const resetPipeline = () =>
-  fetch(`${UPLOAD_BASE}/reset`, { method: 'POST' }).then(handleResponse)
+  fetch(`${BASE}/reset`, { method: 'POST' }).then(handleResponse)
 
 export const tryout = () =>
-  fetch(`${UPLOAD_BASE}/tryout`, { method: 'POST' }).then(handleResponse)
+  fetch(`${BASE}/tryout`, { method: 'POST' }).then(handleResponse)
 
 export const getHistory = () =>
   fetch(`${BASE}/history`).then(handleResponse)
@@ -36,6 +61,18 @@ export const getHistory = () =>
 export const activateSession = (sessionId) =>
   fetch(`${BASE}/history/${encodeURIComponent(sessionId)}/activate`, {
     method: 'POST',
+  }).then(handleResponse)
+
+export const deleteSession = (sessionId) =>
+  fetch(`${BASE}/history/${encodeURIComponent(sessionId)}`, {
+    method: 'DELETE',
+  }).then(handleResponse)
+
+export const renameSession = (sessionId, filename) =>
+  fetch(`${BASE}/history/${encodeURIComponent(sessionId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename }),
   }).then(handleResponse)
 
 export const getSessions = () =>
@@ -57,3 +94,9 @@ export const chat = (question, sessionId = null, history = []) =>
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ question, session_id: sessionId, history }),
   }).then(handleResponse)
+
+export const getScores = () =>
+  fetch(`${BASE}/scores`).then(handleResponse)
+
+export const getLogs = (page = 0) =>
+  fetch(`${BASE}/logs?page=${page}`).then(handleResponse)

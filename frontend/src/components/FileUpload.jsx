@@ -44,10 +44,10 @@ export default function FileUpload({ onFileSelect, disabled }) {
         transition-colors select-none
         ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
         ${dragging
-          ? 'border-blue-400 bg-blue-950/40'
+          ? 'border-blue-400 bg-blue-50 dark:bg-blue-950/40'
           : file
-            ? 'border-green-500 bg-green-950/20'
-            : 'border-gray-600 bg-gray-800/50 hover:border-gray-500 hover:bg-gray-800'
+            ? 'border-green-500 bg-green-50 dark:bg-green-950/20'
+            : 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 hover:border-gray-400 dark:hover:border-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'
         }
       `}
     >
@@ -77,7 +77,7 @@ export default function FileUpload({ onFileSelect, disabled }) {
               d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
           </svg>
           <div className="text-center">
-            <p className="text-gray-300 font-medium">Drop your log file here</p>
+            <p className="text-gray-700 dark:text-gray-300 font-medium">Drop your log file here</p>
             <p className="text-gray-500 text-sm mt-1">or click to browse &nbsp;·&nbsp; .log .txt .csv</p>
           </div>
         </>

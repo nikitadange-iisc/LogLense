@@ -32,6 +32,12 @@ async def list_sessions():
     return [_session_summary(s) for s in sessions]
 
 
+@router.get("/scores")
+async def get_scores():
+    """Score distribution for all sessions — used by the histogram chart."""
+    return app_state.score_distribution
+
+
 @router.get("/sessions/{session_id}")
 async def get_session(session_id: str):
     session = next(

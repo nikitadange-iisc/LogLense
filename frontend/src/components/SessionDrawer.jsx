@@ -13,7 +13,7 @@ function ConfidenceBar({ value }) {
   const color = pct >= 80 ? 'bg-green-500' : pct >= 50 ? 'bg-yellow-500' : 'bg-red-500'
   return (
     <div className="flex items-center gap-2">
-      <div className="flex-1 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+      <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
         <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
       </div>
       <span className="text-xs text-gray-400 w-8 text-right">{pct}%</span>
@@ -61,14 +61,14 @@ export default function SessionDrawer({ sessionId, onClose, onAnalysisComplete }
       />
 
       {/* Drawer */}
-      <aside className="fixed right-0 top-0 h-full w-[520px] max-w-full bg-gray-900 border-l border-gray-700 z-40 flex flex-col overflow-hidden shadow-2xl">
+      <aside className="fixed right-0 top-0 h-full w-[520px] max-w-full bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 z-40 flex flex-col overflow-hidden shadow-2xl">
         {/* Header */}
-        <div className="flex items-start justify-between p-4 border-b border-gray-700 shrink-0">
+        <div className="flex items-start justify-between p-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
           <div className="flex-1 min-w-0">
             <p className="text-xs text-gray-500 mb-0.5">Session</p>
-            <p className="font-mono text-sm text-blue-300 truncate">{sessionId}</p>
+            <p className="font-mono text-sm text-blue-600 dark:text-blue-300 truncate">{sessionId}</p>
           </div>
-          <button onClick={onClose} className="ml-3 text-gray-400 hover:text-gray-200 transition-colors">
+          <button onClick={onClose} className="ml-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -153,9 +153,9 @@ export default function SessionDrawer({ sessionId, onClose, onAnalysisComplete }
                       <p className="text-xs text-gray-500 mb-1.5">Failure Trace</p>
                       <div className="space-y-1.5">
                         {analysis.failure_trace.map((t, i) => (
-                          <div key={i} className="bg-gray-800 rounded p-2">
-                            <p className="font-mono text-xs text-green-300 mb-0.5 break-all">{t.line}</p>
-                            <p className="text-xs text-gray-400">{t.annotation}</p>
+                          <div key={i} className="bg-gray-100 dark:bg-gray-800 rounded p-2">
+                            <p className="font-mono text-xs text-green-700 dark:text-green-300 mb-0.5 break-all">{t.line}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{t.annotation}</p>
                           </div>
                         ))}
                       </div>

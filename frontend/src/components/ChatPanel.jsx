@@ -6,10 +6,10 @@ function Message({ role, content }) {
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div className={`
-        max-w-[85%] rounded-xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap
+        max-w-[85%] rounded-xl px-3.5 py-2.5 text-sm leading-relaxed
         ${isUser
-          ? 'bg-blue-700 text-white rounded-br-none'
-          : 'bg-gray-700 text-gray-100 rounded-bl-none'
+          ? 'bg-blue-600 text-white rounded-br-none'
+          : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-bl-none'
         }
       `}>
         {content}
@@ -66,13 +66,13 @@ export default function ChatPanel({ sessions, focusedSessionId, onFocusSession }
   return (
     <div className="card flex flex-col h-full">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-700 shrink-0 space-y-2">
+      <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 shrink-0 space-y-2">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-gray-200">Chat with AI</h2>
+          <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Chat with AI</h2>
           {history.length > 0 && (
             <button
               onClick={() => setHistory([])}
-              className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+              className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
             >
               Clear
             </button>
@@ -83,7 +83,7 @@ export default function ChatPanel({ sessions, focusedSessionId, onFocusSession }
         <select
           value={selectedSession}
           onChange={e => setSelectedSession(e.target.value)}
-          className="w-full text-xs bg-gray-700 border border-gray-600 rounded-lg px-2.5 py-1.5 text-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="w-full text-xs bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
         >
           <option value="">No session focus (ask about all anomalies)</option>
           {(sessions || []).map(s => (
@@ -97,10 +97,10 @@ export default function ChatPanel({ sessions, focusedSessionId, onFocusSession }
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {history.length === 0 && (
-          <div className="text-center text-gray-600 text-sm mt-8 space-y-3">
+          <div className="text-center text-gray-400 dark:text-gray-600 text-sm mt-8 space-y-3">
             <div className="text-3xl">💬</div>
             <p>Ask anything about the anomalies.</p>
-            <div className="space-y-1 text-xs text-gray-600">
+            <div className="space-y-1 text-xs text-gray-400 dark:text-gray-600">
               <p>"What is the most critical anomaly?"</p>
               <p>"Summarise all high-severity issues"</p>
               <p>"What caused the failures in this session?"</p>
@@ -114,7 +114,7 @@ export default function ChatPanel({ sessions, focusedSessionId, onFocusSession }
 
         {loading && (
           <div className="flex justify-start">
-            <div className="bg-gray-700 rounded-xl rounded-bl-none px-4 py-3 flex gap-1">
+            <div className="bg-gray-100 dark:bg-gray-700 rounded-xl rounded-bl-none px-4 py-3 flex gap-1">
               {[0, 150, 300].map(d => (
                 <span
                   key={d}
@@ -130,7 +130,7 @@ export default function ChatPanel({ sessions, focusedSessionId, onFocusSession }
       </div>
 
       {/* Input */}
-      <div className="p-3 border-t border-gray-700 shrink-0">
+      <div className="p-3 border-t border-gray-200 dark:border-gray-700 shrink-0">
         <div className="flex gap-2">
           <textarea
             value={input}
@@ -138,7 +138,7 @@ export default function ChatPanel({ sessions, focusedSessionId, onFocusSession }
             onKeyDown={onKeyDown}
             placeholder="Ask about the anomalies… (Enter to send)"
             rows={2}
-            className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-500 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="flex-1 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
           <button
             onClick={send}

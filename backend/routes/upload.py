@@ -16,7 +16,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
+from dependencies import get_current_user
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
@@ -30,7 +31,7 @@ UPLOAD_DIR = PROJECT_ROOT / "data" / "raw" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # For tryout demo only — not used for normal uploads
-_DEMO_FILE    = PROJECT_ROOT / "data" / "raw" / "demo_hdfs.log"
+_DEMO_FILE    = PROJECT_ROOT / "data" / "raw" / "HDFS.log"
 _DEMO_DATASET = "hdfs"
 
 
@@ -79,7 +80,8 @@ def _deserialize_session(d: dict):
 # ---------------------------------------------------------------------------
 
 def _run_pipeline(file_path: Path, dataset: str, max_lines: int = None,
-                  session_id: str = None, original_filename: str = None):
+                  session_id: str = None, original_filename: str = None,
+                  user_id: str = ""):
     """
     Blocking pipeline — meant to run inside a BackgroundTask thread.
     """
@@ -90,7 +92,9 @@ def _run_pipeline(file_path: Path, dataset: str, max_lines: int = None,
     session_index_dir.mkdir(parents=True, exist_ok=True)
 
     app_state.active_session_id = session_id
+    app_state.raw_log_path = str(file_path)
     app_state.reset_for_new_run()
+    app_state.raw_log_path = str(file_path)  # reset clears it, restore immediately
 
     try:
         from module1_ingest_parse import run_module1
@@ -105,6 +109,7 @@ def _run_pipeline(file_path: Path, dataset: str, max_lines: int = None,
         if suffix in (".log", ".txt"):
             app_state.set_step("parsing", "Counting lines in log file…", 5)
             total_lines = _count_lines(file_path)
+            app_state.total_log_lines = total_lines
             app_state.job.update({
                 "parsing_total":     total_lines,
                 "parsing_scanned":   0,
@@ -142,6 +147,7 @@ def _run_pipeline(file_path: Path, dataset: str, max_lines: int = None,
                 return
 
             csv_path = m1["csv_path"]
+            app_state.csv_path = csv_path
             app_state.job.update({
                 "parsing_scanned":   m1.get("total_lines", total_lines),
                 "parsing_kept":      m1.get("dedup_lines", 0),
@@ -156,6 +162,7 @@ def _run_pipeline(file_path: Path, dataset: str, max_lines: int = None,
 
         elif suffix == ".csv":
             csv_path = str(file_path)
+            app_state.csv_path = csv_path
             app_state.set_step("detecting", "CSV file — skipping parse step.", 25)
         else:
             raise ValueError(f"Unsupported file type: {suffix}")
@@ -193,8 +200,29 @@ def _run_pipeline(file_path: Path, dataset: str, max_lines: int = None,
             55,
         )
 
-        # ── Module 3 ────────────────────────────────────────────────────────
+        # ── Score distribution for all sessions (chart data) ────────────────
         anomalous_sessions = m2["anomalous"]
+        try:
+            import numpy as np
+            all_sessions = m2["sessions"]
+            gate         = m2["gate"]
+            anomalous_ids = {s.session_id for s in anomalous_sessions}
+            if all_sessions and gate.model is not None:
+                all_vecs   = np.array([s.vector for s in all_sessions])
+                all_scores = gate.score(all_vecs)
+                app_state.score_distribution = [
+                    {
+                        "score":        float(sc),
+                        "label":        getattr(s, "label", None),
+                        "is_anomalous": s.session_id in anomalous_ids,
+                    }
+                    for s, sc in zip(all_sessions, all_scores)
+                ]
+        except Exception as _e:
+            logger.warning("Could not compute score distribution: %s", _e)
+            app_state.score_distribution = []
+
+        # ── Module 3 ────────────────────────────────────────────────────────
         app_state.job.update({"embed_done": 0, "embed_total": len(anomalous_sessions)})
         app_state.set_step(
             "embedding",
@@ -225,6 +253,16 @@ def _run_pipeline(file_path: Path, dataset: str, max_lines: int = None,
 
         if _cancelled():
             app_state.set_error("Cancelled by user.")
+            return
+
+        if m3["sessions_embedded"] == 0:
+            app_state.set_error(
+                f"No anomalous sessions were indexed. "
+                f"Module 2 found {n_anomalous} anomal{'y' if n_anomalous == 1 else 'ies'} "
+                f"from {m2['total_sessions']} sessions, but none had distinct enough "
+                f"patterns to embed. Try a larger log file or check that the dataset "
+                f"type matches your log format."
+            )
             return
 
         app_state.set_step("embedding", "Building RAG pipeline…", 88)
@@ -268,8 +306,13 @@ def _run_pipeline(file_path: Path, dataset: str, max_lines: int = None,
             "created_at":   datetime.now(timezone.utc).isoformat(),
             "stats":        stats,
             "index_dir":    str(session_index_dir),
-            "sessions_data": [_serialize_session(s) for s in anomalous_sessions],
-            "analysis_cache": {},
+            "csv_path":     csv_path,
+            "raw_log_path": str(file_path),
+            "total_log_lines": app_state.total_log_lines,
+            "user_id":      user_id,
+            "sessions_data":      [_serialize_session(s) for s in anomalous_sessions],
+            "analysis_cache":     {},
+            "score_distribution": app_state.score_distribution,
         })
 
         app_state.set_ready(stats)
@@ -291,6 +334,7 @@ async def upload_log(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     dataset: str = Form(...),
+    current_user: str = Depends(get_current_user),
 ):
     if dataset not in ("hdfs", "bgl", "thunderbird"):
         raise HTTPException(status_code=422, detail="dataset must be hdfs, bgl, or thunderbird")
@@ -309,7 +353,7 @@ async def upload_log(
     session_id = str(uuid4())
     app_state.set_step("parsing", f"File '{file.filename}' received. Starting pipeline…", 5)
     background_tasks.add_task(
-        _run_pipeline, dest, dataset, None, session_id, file.filename
+        _run_pipeline, dest, dataset, None, session_id, file.filename, current_user
     )
 
     return {"status": "accepted", "filename": file.filename, "dataset": dataset,
@@ -318,7 +362,7 @@ async def upload_log(
 
 @router.get("/status")
 async def get_status():
-    return app_state.job
+    return {**app_state.job, "active_session_id": app_state.active_session_id}
 
 
 @router.delete("/pipeline")
@@ -333,7 +377,9 @@ async def cancel_pipeline():
 @router.post("/reset")
 async def reset_pipeline():
     """Reset pipeline state back to idle so a new file can be uploaded."""
-    app_state.cancel_requested = True  # signal any running background task to stop
+    if app_state.job["step"] not in ("idle", "ready", "error"):
+        raise HTTPException(status_code=409, detail="Cannot reset while pipeline is running.")
+    app_state.cancel_requested = False   # clear stale cancel flag from previous run
     app_state.job.update({
         "step":     "idle",
         "status":   "idle",
@@ -341,6 +387,7 @@ async def reset_pipeline():
         "progress_pct": 0,
         "stats":    None,
         "error":    None,
+        "failed_at_step": None,
         "parsing_total": 0, "parsing_scanned": 0,
         "parsing_kept": 0,  "parsing_templates": 0,
         "parsing_rate": 0.0, "parsing_current_line": "",
@@ -351,7 +398,10 @@ async def reset_pipeline():
 
 
 @router.post("/tryout")
-async def tryout(background_tasks: BackgroundTasks):
+async def tryout(
+    background_tasks: BackgroundTasks,
+    current_user: str = Depends(get_current_user),
+):
     """Quick demo: run on first 5 000 lines of HDFS.log (if present)."""
     if not _DEMO_FILE.exists():
         raise HTTPException(
@@ -365,7 +415,7 @@ async def tryout(background_tasks: BackgroundTasks):
     session_id = str(uuid4())
     app_state.set_step("parsing", "Try-out mode: sampling 5 000 lines from HDFS.log…", 5)
     background_tasks.add_task(
-        _run_pipeline, _DEMO_FILE, _DEMO_DATASET, 5_000, session_id, "HDFS.log (demo)"
+        _run_pipeline, _DEMO_FILE, _DEMO_DATASET, 5_000, session_id, "HDFS.log (demo)", current_user
     )
     return {"status": "accepted", "mode": "tryout", "max_lines": 5_000,
             "session_id": session_id}
