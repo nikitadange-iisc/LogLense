@@ -123,6 +123,7 @@ def run_module1(
     output_csv: str = None,
     output_pkl: str = None,
     skip_dedup: bool = False,
+    on_progress: callable = None,
 ):
     """
     Run all of Module 1 on a single log file.

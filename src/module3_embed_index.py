@@ -259,6 +259,7 @@ def run_module3(
     append: bool = False,
     index_dir: str = None,
     output_json: str = None,
+    on_progress: callable = None,
 ) -> dict:
     """
     Run Module 3: embed anomalous sessions and store in FAISS index.
