@@ -1,0 +1,253 @@
+{
+  "eval_metadata": {
+    "log_file": "data/raw/HDFS.log",
+    "labels_file": "data/raw/anomaly_label.csv",
+    "golden_dataset": "eval/data/golden_dataset.json",
+    "golden_size": 400,
+    "sessions_analyzed": 5,
+    "total_latency_sec": 273.337
+  },
+  "gate_metrics": {
+    "precision": 0.6509,
+    "recall": 0.69,
+    "f1_score": 0.6699,
+    "accuracy": 0.83,
+    "true_positives": 69,
+    "false_positives": 37,
+    "false_negatives": 31,
+    "true_negatives": 263,
+    "total_evaluated": 400,
+    "coverage": 1.0,
+    "note": "Evaluated 400/400 ground-truth sessions (those present in the log file). F1 benchmark: \u22650.90 (LogHub HDFS standard)."
+  },
+  "llm_aggregate": {
+    "root_cause_specificity": {
+      "pass_rate": 1.0,
+      "pass_count": 5,
+      "n": 5,
+      "weight": 1.0,
+      "description": "Root cause is specific, non-generic, and references actual session components."
+    },
+    "grounding": {
+      "pass_rate": 1.0,
+      "pass_count": 5,
+      "n": 5,
+      "weight": 1.5,
+      "description": "Every line cited in failure_trace exists verbatim (or near-verbatim) in the session."
+    },
+    "completeness": {
+      "pass_rate": 0.0,
+      "pass_count": 0,
+      "n": 5,
+      "weight": 1.0,
+      "description": "Explanation addresses all major anomalous events visible in the session."
+    },
+    "severity_calibration": {
+      "pass_rate": 0.8,
+      "pass_count": 4,
+      "n": 5,
+      "weight": 0.75,
+      "description": "Severity label (critical/high/medium/low) is appropriate given the evidence."
+    },
+    "actionability": {
+      "pass_rate": 0.0,
+      "pass_count": 0,
+      "n": 5,
+      "weight": 0.75,
+      "description": "Recommended actions are specific, concrete, and tied to this session."
+    },
+    "retrieval_relevance": {
+      "pass_rate": 0.0,
+      "pass_count": 0,
+      "n": 5,
+      "weight": 0.75,
+      "description": "Retrieved historical examples are relevant to the current failure pattern."
+    },
+    "composite_unweighted": {
+      "mean": 0.4667,
+      "n": 5
+    },
+    "composite_weighted": {
+      "mean": 0.5391,
+      "n": 5,
+      "note": "Grounding has 1.5\u00d7 weight (hallucination is highest-risk failure mode)."
+    }
+  },
+  "session_results": [
+    {
+      "session_id": "blk_-1608999687919862906",
+      "label": "Unknown",
+      "gate_prediction": "Anomaly",
+      "llm_scores": {
+        "root_cause_specificity": {
+          "score": 1,
+          "reason": "Root cause correctly identifies the specific block ID (blk_-1608999687919862906) and describes the actual workflow visible in logs: block allocation, multi-node replication across specific IPs (10.250.19.102, 10.250.10.6, 10.250.14.224, 10.251.111.209, 10.251.215.16), packet responders terminating normally, and successful block storage updates."
+        },
+        "grounding": {
+          "score": 1,
+          "reason": "All cited log lines from the failure trace appear verbatim in the actual session logs with only minor whitespace variations."
+        },
+        "completeness": {
+          "score": 0,
+          "reason": "The explanation fails to identify the anomalous pattern of a single block being replicated across an unusually large number of datanodes (10+ nodes) and then served to an extremely high number of client nodes (100+), which is atypical for standard HDFS block replication and suggests potential data distribution or broadcast-like behavior."
+        },
+        "severity_calibration": {
+          "score": 1,
+          "reason": "The assigned 'low' severity is appropriate as the logs show normal HDFS block replication workflow with successful block allocation, distribution across multiple datanodes, and proper cleanup\u2014all INFO-level events with no errors, failures, or anomalies detected."
+        },
+        "actionability": {
+          "score": 0,
+          "reason": "The recommendation is generic monitoring advice without any session-specific investigation steps, resource identifiers, or concrete actions tied to this particular HDFS session."
+        },
+        "retrieval_relevance": {
+          "score": 0,
+          "reason": "Retrieved examples lack detailed failure pattern information (only block IDs and normal/anomaly labels provided) making it impossible to compare specific event sequences, error types, or operational characteristics with the current session's block receiving and packet responder termination pattern."
+        }
+      },
+      "llm_composite_score": 0.5,
+      "llm_weighted_score": 0.5652,
+      "latency_sec": 14.881,
+      "error": null
+    },
+    {
+      "session_id": "blk_7503483334202473044",
+      "label": "Unknown",
+      "gate_prediction": "Anomaly",
+      "llm_scores": {
+        "root_cause_specificity": {
+          "score": 1,
+          "reason": "Root cause specifically references the block ID (blk_7503483334202473044), the complete lifecycle stages (received, verified, deleted) that are directly evidenced in the logs, and accurately describes the sequence of DataNode operations and NameSystem block map updates visible in the actual log lines."
+        },
+        "grounding": {
+          "score": 1,
+          "reason": "All lines cited in the failure_trace (lines 1-21) appear verbatim or with only minor whitespace differences in the actual session log lines provided."
+        },
+        "completeness": {
+          "score": 0,
+          "reason": "The explanation fails to identify the anomalous pattern of duplicate block deletion: the same block is deleted 6 times across the dataset (lines 21-26), which is excessive and suggests either a bug in the deletion logic or corrupted block metadata."
+        },
+        "severity_calibration": {
+          "score": 1,
+          "reason": "The assigned 'low' severity is proportionate\u2014the logs show normal HDFS block lifecycle (allocation, replication across 3 nodes, verification, and deletion) with all operations completing successfully and no anomalies or service impact."
+        },
+        "actionability": {
+          "score": 0,
+          "reason": "The recommendation is generic advice to continue monitoring without any session-specific investigation steps, resource identifiers, or concrete actions tied to block_7503483334202473044."
+        },
+        "retrieval_relevance": {
+          "score": 0,
+          "reason": "All retrieved examples are labeled as 'Normal' operations, showing no failure patterns to compare against the current session's block receiving and packet responder activities."
+        }
+      },
+      "llm_composite_score": 0.5,
+      "llm_weighted_score": 0.5652,
+      "latency_sec": 13.82,
+      "error": null
+    },
+    {
+      "session_id": "blk_-3544583377289625738",
+      "label": "Unknown",
+      "gate_prediction": "Anomaly",
+      "llm_scores": {
+        "root_cause_specificity": {
+          "score": 1,
+          "reason": "Root cause specifically references the block ID blk_-3544583377289625738, describes the actual lifecycle events visible in logs (receiving, storing, serving), mentions multiple clients and specific data nodes, and accurately characterizes the successful completion pattern shown in the log lines."
+        },
+        "grounding": {
+          "score": 1,
+          "reason": "All lines cited in the failure_trace appear verbatim in the actual session log lines with only minor whitespace differences."
+        },
+        "completeness": {
+          "score": 0,
+          "reason": "The explanation fails to identify the critical anomalous pattern: a block deletion warning ('BlockInfo not found in volumeMap') occurring while the block is still being actively served to clients, indicating a race condition or premature deletion."
+        },
+        "severity_calibration": {
+          "score": 0,
+          "reason": "The assigned 'low' severity is miscalibrated; the final WARN message 'BlockInfo not found in volumeMap' indicates a data consistency issue during block deletion that should be classified as 'medium' or 'high' severity, not 'low'."
+        },
+        "actionability": {
+          "score": 0,
+          "reason": "The recommendation is generic monitoring advice without specific investigation steps, resource identifiers, or concrete actions tied to this session's data."
+        },
+        "retrieval_relevance": {
+          "score": 0,
+          "reason": "All retrieved examples are labeled as 'Normal' operations, showing no failure patterns similar to the current session's block receiving and packet responder termination sequence."
+        }
+      },
+      "llm_composite_score": 0.3333,
+      "llm_weighted_score": 0.4348,
+      "latency_sec": 14.73,
+      "error": null
+    },
+    {
+      "session_id": "blk_-9073992586687739851",
+      "label": "Unknown",
+      "gate_prediction": "Anomaly",
+      "llm_scores": {
+        "root_cause_specificity": {
+          "score": 1,
+          "reason": "Root cause references the specific block ID (blk_-9073992586687739851), names actual HDFS components (NameSystem.allocateBlock, DataXceiver, PacketResponder, DataBlockScanner), identifies three specific datanodes receiving the block, and cites the exact block size (11977 bytes) and verification events visible in the logs."
+        },
+        "grounding": {
+          "score": 1,
+          "reason": "All lines cited in the failure_trace (lines 1-22) appear verbatim or with only minor whitespace differences in the actual session log lines provided."
+        },
+        "completeness": {
+          "score": 0,
+          "reason": "The explanation fails to identify the anomalous pattern that block blk_-9073992586687739851 is received from three different datanodes (10.250.19.102, 10.250.14.196, 10.250.7.244) nearly simultaneously within the same second (203523-203524), which is unusual for a single block write operation and suggests potential replication or network anomalies."
+        },
+        "severity_calibration": {
+          "score": 1,
+          "reason": "The assigned 'low' severity is proportionate\u2014all log entries show successful block allocation, replication to three datanodes, multiple verification passes, and orderly deletion, with no errors or anomalies present."
+        },
+        "actionability": {
+          "score": 0,
+          "reason": "The recommendation provides generic reassurance about normal operation rather than concrete investigation steps tied to session blk_-9073992586687739851, such as specific log paths, node IPs, or verification procedures."
+        },
+        "retrieval_relevance": {
+          "score": 0,
+          "reason": "All retrieved examples are labeled as 'Normal' operations, showing no failure patterns similar to the current session's anomalous HDFS block receiving and packet responder termination sequence."
+        }
+      },
+      "llm_composite_score": 0.5,
+      "llm_weighted_score": 0.5652,
+      "latency_sec": 16.544,
+      "error": null
+    },
+    {
+      "session_id": "blk_7854771516489510256",
+      "label": "Unknown",
+      "gate_prediction": "Anomaly",
+      "llm_scores": {
+        "root_cause_specificity": {
+          "score": 1,
+          "reason": "Root cause specifically references the block lifecycle stages visible in logs (block allocation, packet responder termination, block storage updates, verification) and the actual block ID blk_7854771516489510256 with expected exception handling during the serving phase."
+        },
+        "grounding": {
+          "score": 1,
+          "reason": "All cited log lines (1-4, 5-10, 11-13, 14-16, 17-28, 29, 32, 33-35, 36-38) appear verbatim in the actual session log lines provided."
+        },
+        "completeness": {
+          "score": 0,
+          "reason": "The explanation fails to identify the significant anomalous pattern of multiple consecutive 'Got exception while serving' warnings (17 exceptions across ~10 seconds from 214050-214340) concentrated in a short time window, which represents a notable spike in serving failures that warrants investigation despite being labeled as 'normal network-level issues'."
+        },
+        "severity_calibration": {
+          "score": 1,
+          "reason": "The assigned 'low' severity is proportionate: the block completes its full lifecycle (allocation, reception, verification, serving with expected exceptions, and deletion) with no evidence of data loss or corruption, representing normal operational behavior with transient serving errors."
+        },
+        "actionability": {
+          "score": 0,
+          "reason": "The recommendation is generic advice that this is normal behavior without any concrete investigation steps, specific resource identifiers, or session-specific guidance tied to block blk_7854771516489510256."
+        },
+        "retrieval_relevance": {
+          "score": 0,
+          "reason": "All retrieved examples are labeled as 'Normal' and show no failure patterns, making them unsuitable for comparison with the current anomalous session."
+        }
+      },
+      "llm_composite_score": 0.5,
+      "llm_weighted_score": 0.5652,
+      "latency_sec": 16.485,
+      "error": null
+    }
+  ]
+}

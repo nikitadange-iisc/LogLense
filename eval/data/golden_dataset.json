@@ -1,0 +1,1623 @@
+{
+  "metadata": {
+    "labels_source": "data/raw/anomaly_label.csv",
+    "seed": 42,
+    "n_anomaly_requested": 100,
+    "normal_multiplier": 3.0,
+    "population_total": 575061,
+    "population_anomaly_count": 16838,
+    "population_normal_count": 558223,
+    "population_anomaly_rate": 0.0293,
+    "sample_size": 400,
+    "sample_anomaly_count": 100,
+    "sample_normal_count": 300,
+    "sample_anomaly_rate": 0.25,
+    "min_n_95pct_ci_5pct_margin": 44,
+    "min_n_95pct_ci_10pct_margin": 11,
+    "is_significant_at_95_5": true,
+    "is_significant_at_95_10": true,
+    "confidence_note": "Sample of 400 sessions from population of 575061. 95% CI \u00b15% requires n\u226544 (satisfied: True). Anomaly class: 100 sessions (population: 16838, coverage: 0.6%)."
+  },
+  "records": [
+    {
+      "session_id": "blk_1382870217333188733",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-7628645466087038790",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-8403805604383559873",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-8716741716336163570",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_8905483616943603485",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-1018270627550679563",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_2142866050238362100",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_2489005370559624566",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_5114797779055345174",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_2947381283485589948",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_5990909518282529273",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-2818907348066567203",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-299674282465425293",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_6225968171754196940",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-3118583241037528269",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-2435654477712819339",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_2980785411366250213",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_7791852731229599479",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-6679086899551319894",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_7201835636065377222",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_2779379770011129348",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-2233966600120565909",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_9198988721924111909",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-1286872495528422406",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_7664815304107905181",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_6616473383545080081",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_3362911273306490935",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-7230809948062586863",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-5346782411987479226",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-1220518032594931149",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_5948687304634213927",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_3654371278525215630",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-6936016794989620599",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-9212281326832603715",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_4241879121507514828",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_8485634802897955525",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-4005431860677064574",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-160010654451213654",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_677839552689560672",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-5896040920803661086",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_6214441637959047069",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_8984546788451133017",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_1316132013056713994",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_8088390247519157526",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_7751480552410328385",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_6165259186583119326",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-6887493335656552339",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_320644921398984210",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_1516523548972560941",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_5427552375444149328",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_2421635270392289823",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_1960523719894722707",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-35383493365139162",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-5102784650586907543",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_2297145385235086288",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-651213569223841236",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_7883501413857901854",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-4576702702497599149",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-8357866590409204770",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_2403690487004434833",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-4748758101299760493",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-3122120273062111084",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_7822638093871986322",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-8766353472096918533",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_2483540819681083413",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-6030232344549774229",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-4980616957379704234",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-4537839647958624939",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_2236072315861262050",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-2198542638208914443",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-3925188291384138686",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-8688812950349195543",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_6705305520666599053",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_5682257772195939515",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_182344071892906872",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-4211498358806566690",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_3673472648518570553",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_3407155175278181298",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-6881965144878374671",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-4072630768970171839",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_2265323277046402295",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-1052613103528281677",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-4862069405152226317",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-1733262562948913096",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_4278121608985213811",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_8997643475422997136",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_7784861931677041743",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-313123663668979004",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_291857431012811543",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_5765551875597159208",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_6482756631631441004",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-9078802094690463609",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-5193931826465378397",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-578562521814953048",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-1454276427893352212",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_7231043887736100661",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-7099169980345514003",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-4897816120701356306",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-4156050970963934419",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_3166642848753050469",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-1353078178527267280",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_7885936855437965210",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-3150166980437378646",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_581787024643642035",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_4680948108334912136",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-7552081187740520352",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_961007538571573129",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_5036366507854239559",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_6567238221370546032",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-2806264809802671172",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-212879379851735628",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_2212754298315677732",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_719987938227169854",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-111009123109180926",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_4436615223155408562",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_1887089008132902182",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-5057990875098383691",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_4118598497006001462",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_3577689914167878451",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_6966396713851954289",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_4515394756569999474",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_1336138796702759107",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-1971559996600088191",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-2362604185918452132",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_7311825210987721440",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_5301410918693465572",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-950026189490537156",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_1260043672000706279",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_8558434846779234494",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-9101419903534534322",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-4469511963512407083",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-5588385362906290994",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-3267088008835221872",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_3532488944585869420",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_4780650702265629827",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-8018959872531783491",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-8076227232866191962",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-7296822778445897204",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_5448152013484094214",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-7303781424567256843",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-581246232073061340",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-7162143698005197986",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-8449256395422728843",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-34987998371822151",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_3941146285359064933",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-3065509388352696313",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_1777671119364065421",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_8484802608004253896",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_8273805775898166834",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_9186241875640781721",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-4459047771983785547",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_6920298967686302605",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-2197115281141372353",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_6064295214517058617",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_4131940623147834754",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_8166890690857153761",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_2732252636262380533",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-4036345667773368086",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_5817968084330369977",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_8347516047232178417",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_5199810011254199420",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_7724118262756353208",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_2793328183720395427",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_7057895453737051520",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-5156345547140447996",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_4263958086463289587",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-9177913897112959569",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-7829927067922771985",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_2857690803674708803",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-2982448643524492458",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-6753730426244890266",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_8432450707449219262",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-5508907219210927864",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_6984165722984846920",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-5871277045906236138",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_8712801945607059624",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_9151075969723928478",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_7384939213318825999",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_3024619198309630847",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_580495901898050798",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_2073629213883465855",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_9061587914329730665",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-4319391168430863654",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_1524771909348385883",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-6897942584703984559",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_6056269933286626570",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_462468921369310210",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_7020454344811056730",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-5062403906324004047",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_198976689922382782",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_7376471510740834757",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_8501405144488072131",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-8130702598055971215",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-3479519263842285232",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-5561227004498472461",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_1417712332693824021",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_1931816050404578923",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_5465716770492008676",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-8452390916047254559",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-9163534267741656703",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-8614330514738509911",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-7145312024511582970",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_7381856612630340835",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-8158869471298134965",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-4911887615563613012",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-2873206302243970047",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_8446327486662523977",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-2561295012034024164",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-7322581098555472813",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_8052044896104488531",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-3197555183164500073",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_6884856587329250740",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-7103371391211914075",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_2774162103548286004",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-3436579061443747078",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-2671075840635234053",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_2403374163454772485",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_3321650655662705593",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_4685594412289814212",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-8306635528620904064",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_8581581433902438340",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_8623385392338015890",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-8555951905397149559",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-4052771555148135945",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-2447008916249474148",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-4951624264156042845",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_8431040238184046136",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-7595132788765971489",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_5072746069418505010",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-1855164837356221824",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-9145526073930369848",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_5280280625462583606",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_41434135985318145",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-7716493588056776950",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_4378645256411162470",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-7877418224221790610",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_260620186872930989",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-5166540127350159988",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-6097293056486042590",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_6647737380624077905",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-2114014635570737866",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-4362064664168497626",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-1299552851194772522",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-7498075734801068292",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-5883020262644138781",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_7459235594723020921",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_2268211978064480342",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-2963956958732885176",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_187821531004592722",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-5577851644656474320",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-2787447001405057213",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-7944731549727576064",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-4714553869551705920",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_3991549120817622684",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-2883163596880487590",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_750789512904878637",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-7150140213169610993",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-2372286472986006139",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-3193669102428798150",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-3246196683422878280",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_9137967587871021981",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-2568185981353669726",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-1066358454928994434",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_2406014463256125197",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-5618203386732358852",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-826920518336899809",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-4188217580098311154",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-6149243246562616007",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-9199763208060966748",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_5051186167066007134",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-8514826457291272823",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_3294040193752213839",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_8506085636456025727",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-3167169099864186718",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-2348626937593869072",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-6891626593289133187",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_2413387829121758055",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-8775434157500444877",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_7379145044250435225",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_2057941530893007184",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-2183092077810188151",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_3512096174800946920",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-3088461653577063063",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_6443644160771958180",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-867348525393067565",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-5341924029095880174",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-4576891282868353484",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_1955125484433273064",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_1319935253660888205",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-6529475543536470201",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_5976251803561182214",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_2656567177850237095",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_5327041108414073666",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-5107196300110208007",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-8112414658350736144",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-6984672629268240844",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-3654182494953007510",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_534228447636259073",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-4585804595767332985",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_7357616985753129977",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-9199850501414614002",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_7802503454587138022",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_8501084852672554886",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-3104331663900558299",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_6887706450565383857",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-3143647809608065600",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-6000149642308918853",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-4469434660443809068",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-5793130155037357776",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_4544726503038118079",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_8542945160746774511",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_5800774081627434040",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_3978639425686312273",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-7613451357529180000",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-9065099184302941725",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_6401096258218888274",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-652687758344463663",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-1649437442018251477",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-3862010072880101620",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-123947399091420290",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-410063613736270985",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_3784469656649495224",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_6206650740015918997",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-8034806127829858633",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_3290612898119130577",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_937236802933810351",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_9192810388494341561",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_467909191064266711",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-2765157386295092568",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_197854215792853786",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_2254481972833382718",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_6172063577174298510",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_7652901929929773800",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_7091841972560339324",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_4568849013802524106",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-7182976549839660766",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-5730642897881037766",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_1318487680176341696",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-2229119867773481768",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-4388553263262782766",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_8093629045470682940",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_1127091680104441646",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_6015171255618340671",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-3891696715628752224",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-7732513059505048956",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_8549276602649357445",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-6001425361558412182",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-2755484604292015985",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_4279107948396101772",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_8098902285679445104",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_2222634458409568460",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-3939490794729216317",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_4610977407840826905",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-1101203041236820226",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-8664491131841331839",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-949150679361099793",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-4300500422538871247",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_5173820470057855480",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_2925528737400315793",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-3326922352982246614",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-2293248772062865349",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-1769152213708481011",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_4953008233971898606",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-6112225409957137865",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_107368046758875760",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-6479882954294397817",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_4056611704148637674",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-5872301838127570573",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-8379691985708071045",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_3234737279669234200",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-5928911033144348119",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-9207743312984126217",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_6817238071462193440",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-2546725083105985759",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-7811393214848698452",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-8317685510412797851",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-5056424066149725037",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-7513920047834163863",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-2811845430882034340",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-4552378340524359116",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-9195444622710639835",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_8827684391535880373",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-5941325171784605323",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_4142337755660557424",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-3332017636643108289",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_6281051316612078141",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-4579000835141488249",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-1297382687279277816",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_7025603709805860232",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_-8879529059350424472",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-43525108786698817",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_5162595537609758331",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-6551138367693408465",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_5281484187932680565",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-8024728684525983897",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_7373855636366949203",
+      "label": "Anomaly"
+    },
+    {
+      "session_id": "blk_6283225908331207042",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_2344181619606064965",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-7892601181218821364",
+      "label": "Normal"
+    },
+    {
+      "session_id": "blk_-8725035820785283269",
+      "label": "Normal"
+    }
+  ]
+}

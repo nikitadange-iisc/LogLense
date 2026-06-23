@@ -43,3 +43,8 @@ results_*.json
 data/raw/*.tar.gz
 data/raw/*.log
 data/raw/HDFS*
+
+# Legacy / unused files
+api/
+frontend/app.js
+frontend/styles.css
