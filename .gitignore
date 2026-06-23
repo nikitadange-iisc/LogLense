@@ -21,6 +21,7 @@ data/raw/*.zip
 data/raw/preprocessed/
 !data/raw/sample_hdfs.log
 !data/raw/sample_labels.csv
+!data/raw/demo_hdfs.log
 data/processed/
 models
 all-MiniLM-L6-v2

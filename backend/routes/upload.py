@@ -30,7 +30,7 @@ UPLOAD_DIR = PROJECT_ROOT / "data" / "raw" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # For tryout demo only — not used for normal uploads
-_DEMO_FILE    = PROJECT_ROOT / "data" / "raw" / "HDFS.log"
+_DEMO_FILE    = PROJECT_ROOT / "data" / "raw" / "demo_hdfs.log"
 _DEMO_DATASET = "hdfs"
 
 
