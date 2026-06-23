@@ -28,7 +28,7 @@ def _session_summary(s) -> dict:
 async def list_sessions():
     if not app_state.sessions:
         return []
-    sessions = sorted(app_state.sessions, key=lambda s: s.anomaly_score or 0)
+    sessions = sorted(app_state.sessions, key=lambda s: getattr(s, "anomaly_score", None) or 0)
     return [_session_summary(s) for s in sessions]
 
 

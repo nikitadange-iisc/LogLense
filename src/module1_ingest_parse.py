@@ -58,6 +58,10 @@ logger = logging.getLogger(__name__)
 OUTPUT_DIR = PROJECT_ROOT / "data" / "processed"
 MODEL_DIR  = PROJECT_ROOT / "models" / "drain_state"
 
+# How often (in lines scanned) to fire the on_progress callback and check the
+# should_cancel signal during the streaming parse loop.
+_PROGRESS_EVERY = 1000
+
 # CSV column schemas per dataset.
 # Column names are Title-Cased; the row builder lowercases them to look up
 # the matching key in the parsed-line dict returned by LogParser.parse_line().
@@ -123,6 +127,8 @@ def run_module1(
     output_csv: str = None,
     output_pkl: str = None,
     skip_dedup: bool = False,
+    on_progress=None,
+    should_cancel=None,
 ):
     """
     Run all of Module 1 on a single log file.
@@ -136,9 +142,16 @@ def run_module1(
         output_csv: Custom CSV output path (auto-named if None).
         output_pkl: Custom Drain pickle path (auto-named if None).
         skip_dedup: Set True if the input is already deduplicated.
+        on_progress: Optional callback invoked periodically during parsing as
+                    ``on_progress(scanned, kept, templates, elapsed, current_line)``.
+                    Used by the API layer to stream live progress to the UI.
+        should_cancel: Optional zero-arg callable returning True when the caller
+                    wants to abort. When it returns True the function stops
+                    early and returns ``None``.
 
     Returns:
-        Dict with output paths, summary numbers, and the resolved dataset.
+        Dict with output paths, summary numbers, and the resolved dataset, or
+        ``None`` if the run was cancelled via ``should_cancel``.
     """
     input_path = Path(input_path)
     if not input_path.exists():
@@ -230,11 +243,34 @@ def run_module1(
                     f"{rate:,.0f}",
                 )
 
+            # Stream progress to the caller (API/UI) and honour cancellation.
+            # Keyed on total_lines so it fires even while a long run of
+            # consecutive duplicates is being skipped above.
+            if (on_progress or should_cancel) and total_lines % _PROGRESS_EVERY == 0:
+                if should_cancel and should_cancel():
+                    logger.info("Module 1 cancelled by caller at line %s",
+                                f"{total_lines:,}")
+                    return None
+                if on_progress:
+                    on_progress(
+                        total_lines,
+                        kept_lines,
+                        parser.get_template_count(),
+                        time.time() - t0,
+                        raw_line,
+                    )
+
             if max_lines and kept_lines >= max_lines:
                 logger.info("  Reached --max-lines limit (%s)", f"{max_lines:,}")
                 break
 
     elapsed = time.time() - t0
+
+    # Final progress tick so short files (that never hit the interval) still
+    # report a 100%-complete state to the UI.
+    if on_progress:
+        on_progress(total_lines, kept_lines, parser.get_template_count(), elapsed, "")
+
     spot_check_rows = head_rows + reservoir
     n_unique_events = len(event_id_counts)
 

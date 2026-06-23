@@ -136,7 +136,9 @@ class RAGPipeline:
 
         # Resolve provider
         self.provider = _detect_provider() if llm_provider == "auto" else llm_provider
-        self.model    = model or _DEFAULT_MODELS.get(self.provider, "")
+        # Model precedence: explicit arg → LLM_MODEL from .env → built-in default.
+        # This lets operators pin a model (e.g. claude-haiku-4-5) via .env.
+        self.model    = model or os.getenv("LLM_MODEL") or _DEFAULT_MODELS.get(self.provider, "")
         self._client  = None
 
         if self.provider == "claude":

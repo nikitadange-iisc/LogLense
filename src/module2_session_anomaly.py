@@ -89,6 +89,7 @@ def run_module2(
     model_path: str = None,
     train: bool = True,
     weighting: str = None,
+    on_stage=None,
 ) -> dict:
     """
     Run all of Module 2 on a structured CSV produced by Module 1.
@@ -107,10 +108,19 @@ def run_module2(
         model_path    : Custom IF model path (auto-named if None).
         train         : Train a new model; if False, load existing model.
         weighting     : "count" or "tfidf"; defaults to per-dataset setting.
+        on_stage      : Optional callback ``on_stage(stage, message)`` invoked at
+                        each major step ("loading", "sessionizing",
+                        "vectorizing", "training", "scoring"). Used by the API
+                        layer to surface progress in the UI.
 
     Returns:
         Dict with paths, counts, evaluation metrics, and anomalous sessions.
     """
+    def _stage(stage, message):
+        logger.info(message)
+        if on_stage:
+            on_stage(stage, message)
+
     csv_path  = Path(csv_path)
     if not csv_path.exists():
         raise FileNotFoundError(f"CSV not found: {csv_path}")
@@ -136,9 +146,11 @@ def run_module2(
     t0 = time.time()
 
     # ── Step 1: Load events from Module 1 CSV ───────────────────────────
+    _stage("loading", "Loading events from structured CSV…")
     events = load_events_from_csv(str(csv_path), dataset)
 
     # ── Step 2: Sessionize ──────────────────────────────────────────────
+    _stage("sessionizing", "Grouping events into sessions…")
     sessionizer = Sessionizer(
         method=method,
         window_size=window_size,
@@ -151,6 +163,23 @@ def run_module2(
         sessions = sessions[:max_sessions]
         logger.info("Capped at %d sessions (--max-sessions)", max_sessions)
 
+    # Fail fast with an actionable message instead of letting an empty feature
+    # matrix reach Isolation Forest (which raises an opaque
+    # "Expected 2D array, got 1D array instead" error). Zero sessions almost
+    # always means the selected dataset type does not match the log format.
+    if not sessions:
+        _hint = {
+            "hdfs": "HDFS grouping needs Block IDs like 'blk_-1608999687919862906' "
+                    "on each line.",
+            "bgl": "BGL grouping needs node identifiers in each line.",
+            "thunderbird": "Thunderbird uses a sliding window over events.",
+        }.get(dataset, "")
+        raise ValueError(
+            f"No sessions could be formed from {len(events):,} events using the "
+            f"'{dataset}' method ('{method}'). This usually means the selected "
+            f"dataset type does not match the uploaded log format. {_hint}".strip()
+        )
+
     # ── Step 3: Assign ground-truth labels ──────────────────────────────
     if label_path and dataset == "hdfs":
         sessions = sessionizer.load_labels(label_path, sessions)
@@ -159,12 +188,14 @@ def run_module2(
     # else: no labels; evaluation will be skipped
 
     # ── Step 4: Vectorize & persist vocabulary ──────────────────────────
+    _stage("vectorizing", "Vectorizing sessions…")
     sessions, vocabulary = sessionizer.vectorize_all(sessions)
     idf = (sessionizer.build_idf(sessions, vocabulary)
            if weighting == "tfidf" else None)
     sessionizer.save_vocabulary(vocabulary, str(vocab_path), idf=idf)
 
     # ── Step 5: Train / load Isolation Forest ───────────────────────────
+    _stage("training", "Training Isolation Forest…")
     gate = AnomalyGate(
         model_path=str(model_path),
         contamination=contamination,
@@ -187,6 +218,7 @@ def run_module2(
         gate.load_model()
 
     # ── Step 6: Filter anomalous sessions ───────────────────────────────
+    _stage("scoring", "Scoring sessions for anomalies…")
     anomalous = gate.filter_anomalous(sessions)
 
     # ── Step 7: Compute anomaly scores for anomalous sessions ───────────
@@ -196,6 +228,10 @@ def run_module2(
         scores = gate.score(vecs)
         for s, sc in zip(anomalous, scores):
             anomaly_scores[s.session_id] = float(sc)
+            # Also store the score on the Session object itself so downstream
+            # consumers (Module 3 metadata, the API /sessions list, Module 4
+            # sorting) can read it via s.anomaly_score instead of this dict.
+            s.anomaly_score = float(sc)
 
     # ── Step 8: Evaluate if labels are available ─────────────────────────
     labeled = [s for s in sessions if s.label is not None]

@@ -44,6 +44,7 @@ class Session:
     raw_lines: list = field(default_factory=list)
     vector: Optional[np.ndarray] = None
     label: Optional[str] = None   # "Normal" | "Anomaly" | None
+    anomaly_score: Optional[float] = None  # Isolation Forest score (set by Module 2)
 
 
 # ---------------------------------------------------------------------------

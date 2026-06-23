@@ -259,6 +259,8 @@ def run_module3(
     append: bool = False,
     index_dir: str = None,
     output_json: str = None,
+    on_progress=None,
+    embedder=None,
 ) -> dict:
     """
     Run Module 3: embed anomalous sessions and store in FAISS index.
@@ -277,6 +279,12 @@ def run_module3(
                           If False (default), overwrite — rebuild from scratch.
         index_dir       : Override default models/faiss_index/ path.
         output_json     : Override default data/processed/<dataset>_embedded.json.
+        on_progress     : Optional callback ``on_progress(done, total)`` invoked
+                          around the embedding step so the API layer can report
+                          progress to the UI.
+        embedder        : Optional pre-loaded ``SessionEmbedder``. When provided
+                          it is reused instead of constructing a new one (avoids
+                          paying the model cold-load cost on every request).
 
     Returns:
         Dict with paths, counts, model info, timing, and live embedder/store
@@ -342,23 +350,42 @@ def run_module3(
 
     if not all_sessions:
         logger.warning("No anomalous sessions to embed — index will not be updated")
-        return {
+        result = {
             "output_json":        str(output_json),
             "index_path":         str(index_dir / "index.faiss"),
             "metadata_path":      str(index_dir / "metadata.pkl"),
             "dataset":            dataset,
             "sessions_embedded":  0,
             "index_size":         0,
-            "embedding_model":    embedding_model,
-            "embedding_dim":      None,
+            "embedding_model":    embedder.model_name if embedder else embedding_model,
+            "embedding_dim":      embedder.dimension if embedder else None,
             "embedding_mode":     embedding_mode,
             "processing_time":    0.0,
         }
+        # When the caller supplied a pre-loaded embedder (the API path), also
+        # hand back an (empty) vector store so it can still build a RAG
+        # pipeline without a KeyError on this zero-anomaly edge case.
+        if embedder is not None:
+            store = FAISSVectorStore(
+                dimension=embedder.dimension,
+                index_type=index_type,
+                index_path=str(index_dir),
+            )
+            if append and (index_dir / "index.faiss").exists():
+                store.load()
+            else:
+                store.reset()
+            result["embedder"]     = embedder
+            result["vector_store"] = store
+        if on_progress:
+            on_progress(0, 0)
+        return result
 
     logger.info("Total anomalous sessions to embed: %d", len(all_sessions))
 
-    # ── Step 2: Initialize embedder ───────────────────────────────────────
-    embedder = SessionEmbedder(model_name=embedding_model)
+    # ── Step 2: Initialize embedder (reuse the caller's if one was passed) ─
+    if embedder is None:
+        embedder = SessionEmbedder(model_name=embedding_model)
 
     # ── Step 3: Initialize / load FAISS store ─────────────────────────────
     store = FAISSVectorStore(
@@ -376,7 +403,11 @@ def run_module3(
 
     # ── Step 4: Embed sessions ─────────────────────────────────────────────
     logger.info("Embedding %d sessions (mode=%s)...", len(all_sessions), embedding_mode)
+    if on_progress:
+        on_progress(0, len(all_sessions))
     embeddings = embedder.embed_batch(all_sessions, mode=embedding_mode)
+    if on_progress:
+        on_progress(len(all_sessions), len(all_sessions))
 
     # ── Step 5: Build metadata and add to index ────────────────────────────
     metadata_list = [_build_metadata(s) for s in all_sessions]
