@@ -6,7 +6,7 @@ function Message({ role, content }) {
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div className={`
-        max-w-[85%] rounded-xl px-3.5 py-2.5 text-sm leading-relaxed
+        max-w-[85%] rounded-xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap
         ${isUser
           ? 'bg-blue-700 text-white rounded-br-none'
           : 'bg-gray-700 text-gray-100 rounded-bl-none'

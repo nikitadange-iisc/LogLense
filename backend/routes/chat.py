@@ -64,6 +64,7 @@ def _build_chat_context(session_id: Optional[str]) -> str:
     stats = app_state.index_stats
     lines = [
         "You are an expert log analyst assistant for the LogSense system.",
+        "Format answers in short paragraphs. If you answer a general question, put any LogSense-specific caveat on a new paragraph.",
         f"The current dataset contains {len(app_state.sessions)} anomalous log sessions.",
         f"Dataset: {stats.get('dataset', 'unknown').upper()}",
         f"Vector index size: {stats.get('size', 0)} sessions",
@@ -101,6 +102,15 @@ def _build_chat_context(session_id: Optional[str]) -> str:
     return "\n".join(lines)
 
 
+def _format_chat_answer(answer: str) -> str:
+    """Keep short direct answers readable when the model appends a caveat."""
+    answer = (answer or "").strip()
+    for marker in (" However,", " However "):
+        if marker in answer and "\n" not in answer[:answer.index(marker)]:
+            return answer.replace(marker, "\n\n" + marker.strip(), 1)
+    return answer
+
+
 @router.post("/chat")
 async def chat(req: ChatRequest):
     if app_state.rag_pipeline is None:
@@ -130,7 +140,7 @@ async def chat(req: ChatRequest):
                 messages=messages,
                 temperature=0.3,
             )
-            answer = response.content[0].text
+            answer = _format_chat_answer(response.content[0].text)
 
         else:  # openai
             openai_msgs = [{"role": "system", "content": system_ctx}] + messages
@@ -140,7 +150,7 @@ async def chat(req: ChatRequest):
                 temperature=0.3,
                 max_tokens=1024,
             )
-            answer = response.choices[0].message.content
+            answer = _format_chat_answer(response.choices[0].message.content)
 
         return {"answer": answer, "session_id": req.session_id}
 
