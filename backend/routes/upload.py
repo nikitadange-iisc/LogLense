@@ -333,8 +333,7 @@ async def cancel_pipeline():
 @router.post("/reset")
 async def reset_pipeline():
     """Reset pipeline state back to idle so a new file can be uploaded."""
-    if app_state.job["step"] not in ("idle", "ready", "error"):
-        raise HTTPException(status_code=409, detail="Cannot reset while pipeline is running.")
+    app_state.cancel_requested = True  # signal any running background task to stop
     app_state.job.update({
         "step":     "idle",
         "status":   "idle",
