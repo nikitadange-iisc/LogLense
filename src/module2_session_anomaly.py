@@ -89,6 +89,7 @@ def run_module2(
     model_path: str = None,
     train: bool = True,
     weighting: str = None,
+    on_stage: callable = None,
 ) -> dict:
     """
     Run all of Module 2 on a structured CSV produced by Module 1.
@@ -135,10 +136,16 @@ def run_module2(
 
     t0 = time.time()
 
+    def _stage(name, msg):
+        if on_stage:
+            on_stage(name, msg)
+
     # ── Step 1: Load events from Module 1 CSV ───────────────────────────
+    _stage("loading", "Loading structured events…")
     events = load_events_from_csv(str(csv_path), dataset)
 
     # ── Step 2: Sessionize ──────────────────────────────────────────────
+    _stage("sessionizing", "Grouping events into sessions…")
     sessionizer = Sessionizer(
         method=method,
         window_size=window_size,
@@ -159,12 +166,14 @@ def run_module2(
     # else: no labels; evaluation will be skipped
 
     # ── Step 4: Vectorize & persist vocabulary ──────────────────────────
+    _stage("vectorizing", "Vectorizing sessions…")
     sessions, vocabulary = sessionizer.vectorize_all(sessions)
     idf = (sessionizer.build_idf(sessions, vocabulary)
            if weighting == "tfidf" else None)
     sessionizer.save_vocabulary(vocabulary, str(vocab_path), idf=idf)
 
     # ── Step 5: Train / load Isolation Forest ───────────────────────────
+    _stage("training", "Training Isolation Forest…")
     gate = AnomalyGate(
         model_path=str(model_path),
         contamination=contamination,
@@ -187,6 +196,7 @@ def run_module2(
         gate.load_model()
 
     # ── Step 6: Filter anomalous sessions ───────────────────────────────
+    _stage("scoring", "Scoring and filtering anomalous sessions…")
     anomalous = gate.filter_anomalous(sessions)
 
     # ── Step 7: Compute anomaly scores for anomalous sessions ───────────
