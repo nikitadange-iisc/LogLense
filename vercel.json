@@ -10,7 +10,7 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "https://your-project.up.railway.app/api/$1"
+      "dest": "https://loglense-production.up.railway.app/api/$1"
     },
     {
       "src": "/(.*)",
