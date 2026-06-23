@@ -11,6 +11,11 @@ build/
 venv/
 .venv/
 
+# Node dependencies and local frontend builds
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
 # Models & Data (reproducible via pipeline)
 models/isolation_forest.joblib
 models/faiss_index/
