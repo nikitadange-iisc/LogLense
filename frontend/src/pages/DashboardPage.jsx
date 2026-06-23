@@ -8,6 +8,18 @@ import LogViewer from '../components/LogViewer'
 import { getSessions, getStatus, getHistory, activateSession, resetPipeline, deleteSession, renameSession, getScores } from '../api/client'
 import ScoreDistributionChart from '../components/ScoreDistributionChart'
 
+const DASHBOARD_TABS = [
+  { id: 'anomalies',    label: 'Anomalies' },
+  { id: 'distribution', label: 'Distribution' },
+  { id: 'logs',         label: 'Log Viewer' },
+]
+const DEFAULT_DASHBOARD_TAB = 'anomalies'
+
+function getInitialDashboardTab() {
+  const stored = localStorage.getItem('dashboard_tab')
+  return DASHBOARD_TABS.some(tab => tab.id === stored) ? stored : DEFAULT_DASHBOARD_TAB
+}
+
 function fmt(dt) {
   if (!dt) return ''
   const d = new Date(dt)
@@ -137,12 +149,16 @@ export default function DashboardPage() {
   const [activeHistoryId, setActiveHistoryId] = useState(null)
   const [activating, setActivating]     = useState(false)
   const [scores, setScores]             = useState([])
-  const [activeTab, setActiveTab]       = useState(
-    () => localStorage.getItem('dashboard_tab') || 'anomalies'
-  )
+  const [activeTab, setActiveTab]       = useState(getInitialDashboardTab)
   const navigate = useNavigate()
 
-  useEffect(() => { localStorage.setItem('dashboard_tab', activeTab) }, [activeTab])
+  useEffect(() => {
+    if (!DASHBOARD_TABS.some(tab => tab.id === activeTab)) {
+      setActiveTab(DEFAULT_DASHBOARD_TAB)
+      return
+    }
+    localStorage.setItem('dashboard_tab', activeTab)
+  }, [activeTab])
   useEffect(() => {
     if (activeHistoryId) localStorage.setItem('dashboard_session', activeHistoryId)
   }, [activeHistoryId])
@@ -277,11 +293,7 @@ export default function DashboardPage() {
 
             {/* Tab bar */}
             <div className="flex items-center gap-1 mb-3 shrink-0">
-              {[
-                { id: 'anomalies',    label: 'Anomalies',    count: sessions.length },
-                { id: 'distribution', label: 'Distribution' },
-                { id: 'logs',         label: 'Log Viewer' },
-              ].map(tab => (
+              {DASHBOARD_TABS.map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
@@ -294,10 +306,10 @@ export default function DashboardPage() {
                   `}
                 >
                   {tab.label}
-                  {tab.count != null && (
+                  {tab.id === 'anomalies' && (
                     <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold
                       ${activeTab === tab.id ? 'bg-blue-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'}`}>
-                      {tab.count}
+                      {sessions.length}
                     </span>
                   )}
                 </button>
