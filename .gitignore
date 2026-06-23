@@ -8,6 +8,8 @@ build/
 
 # Environment
 .env
+certs/
+docker-compose.override.yml
 venv/
 .venv/
 

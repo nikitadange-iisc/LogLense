@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+certs
+docker-compose.override.yml
+
+# Python virtual envs / caches
+.venv
+venv
+__pycache__
+**/__pycache__
+*.py[cod]
+*.egg-info
+.pytest_cache
+
+# Frontend (built in its own image; never ship node_modules into backend context)
+frontend
+
+# Local data, models and logs (mounted as volumes at runtime)
+*.log
+results_*.json
+data/raw/*.log
+data/raw/*.tar.gz
+data/raw/*.zip
+data/processed
+
+# Editor / OS cruft
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Docs / tests not needed at runtime
+eval
+tests
+spec.md
