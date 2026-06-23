@@ -1,0 +1,60 @@
+# LogSense - full stack (FastAPI backend + React/nginx frontend)
+#
+#   docker compose up --build        # build images and start
+#   docker compose up -d --build     # ... in the background
+#   docker compose logs -f           # follow logs
+#   docker compose down              # stop and remove
+#
+# Frontend:  http://localhost:5173
+# Backend:   http://localhost:8000/api/health
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: logsense-backend
+    container_name: logsense-backend
+    env_file:
+      - .env
+    environment:
+      # HuggingFace download hardening. The Xet transfer backend routes large
+      # files through a separate CDN host that can hang on restricted networks,
+      # which would block startup (the embedder preloads at boot). Disable Xet
+      # to use the standard HTTPS CDN, and bound every request with timeouts so
+      # a stalled download fails fast and the embedder falls back to TF-IDF
+      # instead of hanging the whole backend.
+      HF_HUB_DISABLE_XET: "1"
+      HF_HUB_DOWNLOAD_TIMEOUT: "20"
+      HF_HUB_ETAG_TIMEOUT: "10"
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persist generated models, FAISS index and processed data on the host.
+      - ./models:/app/models
+      - ./data:/app/data
+      # Persist the downloaded sentence-transformer weights between rebuilds.
+      - hf-cache:/app/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      # The model is downloaded/loaded on first boot; don't fail during that.
+      start_period: 180s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: logsense-frontend
+    container_name: logsense-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  hf-cache:
