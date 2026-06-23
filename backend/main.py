@@ -65,15 +65,22 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# In production (Railway) frontend and backend share the same origin,
-# so CORS is only needed for local dev. Override via ALLOWED_ORIGINS env var.
-_origins = os.getenv(
-    "ALLOWED_ORIGINS",
-    "http://localhost:5173,http://127.0.0.1:5173",
-).split(",")
+# Vercel may serve the frontend separately and call Railway directly.
+# Keep localhost for dev, include the production Vercel URL, and allow
+# Vercel preview deployments through a configurable regex.
+_origins = [
+    origin.strip()
+    for origin in os.getenv(
+        "ALLOWED_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173,https://log-lense-gules.vercel.app",
+    ).split(",")
+    if origin.strip()
+]
+_origin_regex = os.getenv("ALLOWED_ORIGIN_REGEX", r"https://.*\.vercel\.app")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in _origins],
+    allow_origins=_origins,
+    allow_origin_regex=_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
