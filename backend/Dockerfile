@@ -23,8 +23,8 @@ RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTr
 COPY src/ ./src/
 COPY backend/ ./backend/
 
-# Data dirs (FAISS index, trained models baked in at build time if present)
-COPY models/ ./models/
+# Create model dirs — populated at runtime (gitignored, not in build context)
+RUN mkdir -p /app/models/faiss_index /app/models/drain_state
 
 ENV PYTHONPATH=/app/src
 ENV PORT=8000
